@@ -6,12 +6,13 @@ import com.google.gson.JsonObject
 import com.myetherwallet.mewwalletkit.bip.bip44.Address
 import com.myetherwallet.mewwalletkit.core.data.rlp.*
 import com.myetherwallet.mewwalletkit.core.extension.*
-import com.myetherwallet.mewwalletkit.core.extension.toRlp
 import com.myetherwallet.mewwalletkit.eip.eip155.Transaction
 import com.myetherwallet.mewwalletkit.eip.eip155.TransactionCurrency
 import com.myetherwallet.mewwalletkit.eip.eip155.TransactionSignature
-import com.myetherwallet.mewwalletkit.eip.eip2930.AccessList
+import com.myetherwallet.mewwalletkit.eip.eip681.AbiFunction
 import kotlinx.parcelize.Parcelize
+import pm.gnosis.model.Solidity
+import pm.gnosis.model.SolidityBase
 import java.math.BigInteger
 
 @Parcelize
@@ -19,7 +20,7 @@ class Eip712Transaction(
     override var nonce: BigInteger = BigInteger.ZERO,
     val maxPriorityFeePerErg: BigInteger = BigInteger.ZERO,
     val maxFeePerErg: BigInteger = BigInteger.ZERO,
-    val meta: Meta = Meta(),
+    var meta: Meta = Meta(),
     override var gasLimit: BigInteger = BigInteger.ZERO,
     override var to: Address?,
     override var value: BigInteger = BigInteger.ZERO,
@@ -42,125 +43,86 @@ class Eip712Transaction(
 ) {
 
 
-    /**
-     *  static var types: MessageTypes {
-    return [
-    "EIP712Domain": [
-    .init(name: "name",                     type: "string"),
-    .init(name: "version",                  type: "string"),
-    .init(name: "chainId",                  type: "uint256")
-    ],
-    "Transaction": [
-    .init(name: "txType",                   type: "uint256"),
-    .init(name: "from",                     type: "uint256"),
-    .init(name: "to",                       type: "uint256"),
-    .init(name: "ergsLimit",                type: "uint256"),
-    .init(name: "ergsPerPubdataByteLimit",  type: "uint256"),
-    .init(name: "maxFeePerErg",             type: "uint256"),
-    .init(name: "maxPriorityFeePerErg",     type: "uint256"),
-    .init(name: "paymaster",                type: "uint256"),
-    .init(name: "nonce",                    type: "uint256"),
-    .init(name: "value",                    type: "uint256"),
-    .init(name: "data",                     type: "bytes"),
-    .init(name: "factoryDeps",              type: "bytes32[]"),
-    .init(name: "paymasterInput",           type: "bytes")
-    ]
-    ]
-    }
-     */
+    val eip712Message: String
+        get() {
+            val result = JsonObject()
 
-    /**
-    "txType": Int(self.eipType.rawValue.stringRemoveHexPrefix(), radix: 16) as AnyObject,
-    "from": (from?.address ?? "") as AnyObject,
-    "to": (to?.address ?? "") as AnyObject,
-    "ergsLimit": _ergsLimit as AnyObject,
-    "ergsPerPubdataByteLimit": meta.ergsPerPubdata as AnyObject,
-    "maxFeePerErg": _maxFeePerErg as AnyObject,
-    "maxPriorityFeePerErg": _maxPriorityFeePerErg as AnyObject,
-    "paymaster": (meta.paymaster?.paymaster.address ?? "") as AnyObject,
-    "nonce": _nonce as AnyObject,
-    "value": _value as AnyObject,
-    "data": data as AnyObject,
-    "factoryDeps": (meta.factoryDeps ?? []) as AnyObject,
-    "paymasterInput": (meta.paymaster?.input ?? Data()) as AnyObject
-     */
-
-
-
-    fun eip712Message(): String {
-        val result = JsonObject()
-
-        val factoryDeps = JsonArray().apply {
-            meta.factoryDeps?.forEach {
-                add(it.toHexString())
+            val factoryDeps = JsonArray().apply {
+                meta.factoryDeps?.forEach {
+                    add(it.toHexString())
+                }
             }
-        }
 
-        val input = JsonObject().apply {
-            addProperty("txType", eipType.data.first().toInt())
-            addProperty("from", from?.address ?: "0x")
-            addProperty("to", to?.address ?: "0x")
-            addProperty("ergsLimit", ergsLimit.toHexString().addHexPrefix())
-            addProperty("ergsPerPubdataByteLimit", meta.ergsPerPubdata.toHexString().addHexPrefix())
-            addProperty("maxFeePerErg", maxFeePerErg.toHexString().addHexPrefix())
-            addProperty("maxPriorityFeePerErg", maxPriorityFeePerErg.toHexString().addHexPrefix())
-            addProperty("paymaster", meta.paymaster?.paymaster?.address ?: "0x")
-            addProperty("nonce", nonce.toHexString().addHexPrefix())
-            addProperty("value", value.toHexString().addHexPrefix())
-            addProperty("data", data.toHexString().addHexPrefix())
-            add("factoryDeps",factoryDeps)
-            addProperty("paymasterInput", meta.paymaster?.input?.toHexString() ?: "0x")
+            val input = JsonObject().apply {
+                addProperty("txType", eipType.data.first().toInt())
+                addProperty("from", from?.address ?: "0x")
+                addProperty("to", to?.address ?: "0x")
+                addProperty("ergsLimit", ergsLimit.toHexString().addHexPrefix())
+                addProperty(
+                    "ergsPerPubdataByteLimit",
+                    meta.ergsPerPubdata.toHexString().addHexPrefix()
+                )
+                addProperty("maxFeePerErg", maxFeePerErg.toHexString().addHexPrefix())
+                addProperty(
+                    "maxPriorityFeePerErg",
+                    maxPriorityFeePerErg.toHexString().addHexPrefix()
+                )
+                addProperty("paymaster", meta.paymaster?.paymaster?.address ?: "0x")
+                addProperty("nonce", nonce.toHexString().addHexPrefix())
+                addProperty("value", value.toHexString().addHexPrefix())
+                addProperty("data", data.toHexString().addHexPrefix())
+                add("factoryDeps", factoryDeps)
+                addProperty("paymasterInput", meta.paymaster?.input?.toHexString() ?: "0x")
+            }
+            result.add("types", EIP712Message.typesJson)
+            result.addProperty("primaryType", "Transaction")
+            result.add("domain", EIP712Message.domain(chainId))
+            result.add("message", input)
+            return result.toString()
         }
-        result.add("types", EIP712Message.typesJson)
-        result.addProperty("primaryType","Transaction")
-        result.add("domain", EIP712Message.domain(chainId))
-        result.add("message", input)
-        return result.toString()
-    }
 
 
     object EIP712Message {
 
-
         fun domain(chainId: BigInteger?): JsonObject = JsonObject().apply {
-            addProperty("name","zkSync")
-            addProperty("version","2")
+            addProperty("name", "zkSync")
+            addProperty("version", "2")
             addProperty("chainId", chainId)
             add("verifyingContract", null)
         }
 
         val typesJson: JsonObject
-        get() {
-            val types = JsonObject()
-            val eip712Domain = JsonArray()
-            val transaction = JsonArray()
+            get() {
+                val types = JsonObject()
+                val eip712Domain = JsonArray()
+                val transaction = JsonArray()
 
-            eip712Domain.apply {
-                add(type("name","string"))
-                add(type("version","string"))
-                add(type("chainId","uint256"))
+                eip712Domain.apply {
+                    add(type("name", "string"))
+                    add(type("version", "string"))
+                    add(type("chainId", "uint256"))
+                }
+
+                transaction.apply {
+                    add(type("txType", "uint256"))
+                    add(type("from", "uint256"))
+                    add(type("to", "uint256"))
+                    add(type("ergsLimit", "uint256"))
+                    add(type("ergsPerPubdataByteLimit", "uint256"))
+                    add(type("maxFeePerErg", "uint256"))
+                    add(type("maxPriorityFeePerErg", "uint256"))
+                    add(type("paymaster", "uint256"))
+                    add(type("nonce", "uint256"))
+                    add(type("value", "uint256"))
+                    add(type("data", "bytes"))
+                    add(type("factoryDeps", "bytes32[]"))
+                    add(type("paymasterInput", "bytes"))
+                }
+
+                types.add("EIP712Domain", eip712Domain)
+                types.add("Transaction", transaction)
+                return types
             }
-
-            transaction.apply {
-                add(type("txType","uint256"))
-                add(type("from","uint256"))
-                add(type("to","uint256"))
-                add(type("ergsLimit","uint256"))
-                add(type("ergsPerPubdataByteLimit","uint256"))
-                add(type("maxFeePerErg","uint256"))
-                add(type("maxPriorityFeePerErg","uint256"))
-                add(type("paymaster","uint256"))
-                add(type("nonce","uint256"))
-                add(type("value","uint256"))
-                add(type("data","bytes"))
-                add(type("factoryDeps","bytes32[]"))
-                add(type("paymasterInput","bytes"))
-            }
-
-            types.add("EIP712Domain", eip712Domain)
-            types.add("Transaction", transaction)
-            return types
-        }
 
         private fun type(name: String, type: String): JsonObject {
             return JsonObject().apply {
@@ -168,7 +130,8 @@ class Eip712Transaction(
                 addProperty("type", type)
             }
         }
-        val typesString: String =
+
+        const val typesString: String =
             """
         {
    "types":{
@@ -251,15 +214,59 @@ class Eip712Transaction(
         var customSignature: ByteArray? = null,
         val paymaster: Paymaster? = null,
         val factoryDeps: Array<ByteArray>? = null
-    ): Parcelable
+    ) : Parcelable
 
     @Parcelize
-    data class Paymaster(
-        val paymaster: Address,
-        val input: ByteArray?
-    ): Parcelable
+    class Paymaster(val paymaster: Address) : Parcelable {
 
-    val ergsLimit: BigInteger
+        var input: ByteArray? = null
+
+        constructor(paymaster: Address, innerInput: ByteArray) : this(paymaster) {
+            val function = AbiFunction(
+                "general",
+                inputs = listOf(Pair("input", "dynamicBytes")),
+                outputs = arrayOf(),
+                false,
+                false
+            )
+
+            val parameters = listOf<SolidityBase.Type>(
+                Solidity.Bytes(innerInput)
+            )
+
+            input = function.encodeParameters(parameters)
+        }
+
+        constructor(
+            paymaster: Address,
+            token: Address,
+            minimalAllowance: BigInteger,
+            innerInput: ByteArray
+        ) : this(paymaster) {
+            val function = AbiFunction(
+                "approvalBased",
+                inputs = listOf(
+                    Pair("_token", "address"),
+                    Pair("_minAllowance", "uint256"),
+                    Pair("_innerInput", "bytes")
+                ),
+                outputs = arrayOf(),
+                false,
+                false
+            )
+
+            val parameters = listOf(
+                Solidity.String(token.address),
+                Solidity.UInt256(minimalAllowance),
+                Solidity.Bytes(innerInput)
+            )
+
+            input = function.encodeParameters(parameters)
+        }
+
+    }
+
+    private val ergsLimit: BigInteger
         get() = gasLimit
 
     constructor(

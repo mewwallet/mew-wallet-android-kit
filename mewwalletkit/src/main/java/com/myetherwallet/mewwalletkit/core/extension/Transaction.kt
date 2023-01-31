@@ -48,16 +48,13 @@ fun Transaction.eip155sign(
     }
 
     if (eipType == Transaction.EIPTransactionType.EIP712) {
-        (this as? Eip712Transaction)?.let {
-            val message = it.eip712Message()
-
-            val signature = Eip712Utils.getHash(message).secp256k1RecoverableSign(privateKeyData)
-
+        (this as? Eip712Transaction)?.apply {
+            val signature = Eip712Utils.getHash(eip712Message).secp256k1RecoverableSign(privateKeyData)
             val serialized = signature?.secp256k1SerializeSignature()!!
             val rs = serialized.copyOfRange(0, 64)
             val v = (serialized[64] + 27).toByte()
             val normalized = rs + v
-            it.meta.customSignature = normalized
+            meta.customSignature = normalized
         }
     } else {
         this.signature = null

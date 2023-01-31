@@ -20,19 +20,10 @@ data class AbiFunction(
 
     val erc20transfer = Method.ERC20_TRANSFER
 
-    /**
-     * return "\(name ?? "")(\(inputs.map { $0.type.abiRepresentation }.joined(separator: ",")))"
-     */
-    val signature: String
+    private val signature: String
         get() = "${functionName}(${inputs.joinToString(",") { it.second }})"
 
-    /**
-     *    public var methodEncoding: Data {
-    return signature.data(using: .ascii)!.sha3(.keccak256)[0...3]
-    }
-     */
-
-    val methodEncoding: ByteArray
+    private val methodEncoding: ByteArray
         get() = signature.toByteArray(Charsets.US_ASCII).keccak256().take(4).toByteArray()
 
     fun encodeParameters(params: List<SolidityBase.Type>): ByteArray {
