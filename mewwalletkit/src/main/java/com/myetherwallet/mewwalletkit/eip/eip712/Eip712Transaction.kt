@@ -12,7 +12,6 @@ import com.myetherwallet.mewwalletkit.eip.eip155.TransactionSignature
 import com.myetherwallet.mewwalletkit.eip.eip681.AbiFunction
 import kotlinx.parcelize.Parcelize
 import pm.gnosis.model.Solidity
-import pm.gnosis.model.SolidityBase
 import java.math.BigInteger
 
 @Parcelize
@@ -214,57 +213,107 @@ class Eip712Transaction(
         var customSignature: ByteArray? = null,
         val paymaster: Paymaster? = null,
         val factoryDeps: Array<ByteArray>? = null
-    ) : Parcelable
+    ) : Parcelable {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as Meta
+
+            if (ergsPerPubdata != other.ergsPerPubdata) return false
+            if (customSignature != null) {
+                if (other.customSignature == null) return false
+                if (!customSignature.contentEquals(other.customSignature)) return false
+            } else if (other.customSignature != null) return false
+            if (paymaster != other.paymaster) return false
+            if (factoryDeps != null) {
+                if (other.factoryDeps == null) return false
+                if (!factoryDeps.contentDeepEquals(other.factoryDeps)) return false
+            } else if (other.factoryDeps != null) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = ergsPerPubdata.hashCode()
+            result = 31 * result + (customSignature?.contentHashCode() ?: 0)
+            result = 31 * result + (paymaster?.hashCode() ?: 0)
+            result = 31 * result + (factoryDeps?.contentDeepHashCode() ?: 0)
+            return result
+        }
+    }
 
     @Parcelize
-    class Paymaster(val paymaster: Address) : Parcelable {
+    data class Paymaster(
+        val paymaster: Address,
+        val input: ByteArray? = null
+    ) : Parcelable {
 
-        var input: ByteArray? = null
+        companion object {
+            fun general(paymaster: Address, innerInput: ByteArray): Paymaster {
+                val function = AbiFunction(
+                    "general",
+                    inputs = listOf(Pair("input", "dynamicBytes")),
+                    outputs = arrayOf(),
+                    isConstant = false,
+                    isPayable = false
+                )
 
-        constructor(paymaster: Address, innerInput: ByteArray) : this(paymaster) {
-            val function = AbiFunction(
-                "general",
-                inputs = listOf(Pair("input", "dynamicBytes")),
-                outputs = arrayOf(),
-                false,
-                false
-            )
+                val parameters = listOf(Solidity.Bytes(innerInput))
 
-            val parameters = listOf<SolidityBase.Type>(
-                Solidity.Bytes(innerInput)
-            )
+                val input = function.encodeParameters(parameters)
 
-            input = function.encodeParameters(parameters)
+                return Paymaster(paymaster, input)
+            }
+
+            fun approvalBased(
+                paymaster: Address,
+                token: Address,
+                minimalAllowance: BigInteger,
+                innerInput: ByteArray
+            ): Paymaster {
+                val function = AbiFunction(
+                    "approvalBased",
+                    inputs = listOf(
+                        Pair("_token", "address"),
+                        Pair("_minAllowance", "uint256"),
+                        Pair("_innerInput", "bytes")
+                    ),
+                    outputs = arrayOf(),
+                    isConstant = false,
+                    isPayable = false
+                )
+
+                val parameters = listOf(
+                    Solidity.String(token.address),
+                    Solidity.UInt256(minimalAllowance),
+                    Solidity.Bytes(innerInput)
+                )
+
+                val input = function.encodeParameters(parameters)
+                return Paymaster(paymaster, input)
+            }
         }
 
-        constructor(
-            paymaster: Address,
-            token: Address,
-            minimalAllowance: BigInteger,
-            innerInput: ByteArray
-        ) : this(paymaster) {
-            val function = AbiFunction(
-                "approvalBased",
-                inputs = listOf(
-                    Pair("_token", "address"),
-                    Pair("_minAllowance", "uint256"),
-                    Pair("_innerInput", "bytes")
-                ),
-                outputs = arrayOf(),
-                false,
-                false
-            )
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
 
-            val parameters = listOf(
-                Solidity.String(token.address),
-                Solidity.UInt256(minimalAllowance),
-                Solidity.Bytes(innerInput)
-            )
+            other as Paymaster
 
-            input = function.encodeParameters(parameters)
+            if (paymaster != other.paymaster) return false
+            if (!input.contentEquals(other.input)) return false
+
+            return true
         }
 
+        override fun hashCode(): Int {
+            var result = paymaster.hashCode()
+            result = 31 * result + input.contentHashCode()
+            return result
+        }
     }
+
 
     private val ergsLimit: BigInteger
         get() = gasLimit
@@ -407,11 +456,12 @@ class Eip712Transaction(
 
         // 14: Paymaster
         meta.paymaster?.let {
-
-            fields.add(RlpArray(*listOf(
+            val paymasterInputs = listOf(
                 RlpString(it.paymaster.address),
                 RlpByteArray(it.input ?: ByteArray(0))
-            ).toTypedArray()))
+            ).toTypedArray()
+
+            fields.add(RlpArray(*paymasterInputs))
 
         } ?: fields.add(RlpArray())
 

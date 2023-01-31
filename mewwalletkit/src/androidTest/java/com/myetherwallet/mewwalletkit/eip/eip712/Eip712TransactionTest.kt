@@ -20,19 +20,28 @@ class Eip712TransactionTest {
     fun checkForEncoding() {
         val function = AbiFunction(
             "general",
-            inputs = listOf(Pair("input", "dynamicBytes")),
+            inputs = listOf(
+                Pair("input", "bytes")
+            ),
             arrayOf(),
-            false,
-            false
+            isConstant = false,
+            isPayable = false
         )
 
-        val parameters = listOf<SolidityBase.Type>(
-            Solidity.Bytes(ByteArray(0))
-        )
+        val parameters = listOf(Solidity.Bytes("0xaabbcc".hexToByteArray()))
 
         val result = function.encodeParameters(parameters).toHexString()
-        val expected = "8c5a34450000000000000000000000000000000000000000000000000000000000000020"
+        val expected = "8c5a344500000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000003aabbcc0000000000000000000000000000000000000000000000000000000000"
         assertEquals(expected, result)
+    }
+
+
+    @Test
+    fun checkEncodeTuple() {
+        assertEquals(
+            "00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000003aabbcc0000000000000000000000000000000000000000000000000000000000",
+            SolidityBase.encodeTuple(listOf(Solidity.Bytes("0xaabbcc".hexToByteArray())))
+        )
     }
 
     @Test
@@ -92,7 +101,7 @@ class Eip712TransactionTest {
         )
 
         transaction.meta = Eip712Transaction.Meta(
-            paymaster = Eip712Transaction.Paymaster(
+            paymaster = Eip712Transaction.Paymaster.general(
                 paymaster = Address("0x0265d9a5af8af5fe070933e5e549d8fef08e09f4"),
                 innerInput = "0xaabbcc".hexToByteArray()
             )
