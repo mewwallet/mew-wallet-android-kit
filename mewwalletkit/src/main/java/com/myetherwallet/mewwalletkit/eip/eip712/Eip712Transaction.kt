@@ -253,7 +253,7 @@ class Eip712Transaction(
             fun general(paymaster: Address, innerInput: ByteArray): Paymaster {
                 val function = AbiFunction(
                     "general",
-                    inputs = listOf(Pair("input", "dynamicBytes")),
+                    inputs = listOf(Pair("input", "bytes")),
                     outputs = arrayOf(),
                     isConstant = false,
                     isPayable = false

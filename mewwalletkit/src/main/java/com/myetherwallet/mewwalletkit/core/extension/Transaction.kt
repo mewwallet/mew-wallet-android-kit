@@ -23,16 +23,29 @@ fun Transaction.sign(key: PrivateKey, extraEntropy: Boolean = false) {
         this.chainId = key.network.chainId
     }
     val chainId = this.chainId ?: throw InvalidChainIdException()
-    val publicKeyData = key.publicKey()?.data() ?: throw InvalidPublicKeyException()
-    val signature = this.eip155sign(key, extraEntropy)
-    val serializedSignature = signature.first ?: throw InvalidSignatureException()
-    val transactionSignature = TransactionSignature(serializedSignature, chainId)
-    val recoveredPublicKey =
-        transactionSignature.recoverPublicKey(this) ?: throw InvalidSignatureException()
-    if (!publicKeyData.secureCompare(recoveredPublicKey)) {
-        throw InvalidPublicKeyException()
+
+    if (eipType == Transaction.EIPTransactionType.EIP712) {
+        (this as? Eip712Transaction)?.apply {
+            val signature = Eip712Utils.getHash(eip712Message).secp256k1RecoverableSign(key.data())
+            val serialized = signature?.secp256k1SerializeSignature()!!
+            val rs = serialized.copyOfRange(0, 64)
+            val v = (serialized[64] + 27).toByte()
+            val normalized = rs + v
+            meta.customSignature = normalized
+        }
+    } else {
+
+        val publicKeyData = key.publicKey()?.data() ?: throw InvalidPublicKeyException()
+        val signature = this.eip155sign(key, extraEntropy)
+        val serializedSignature = signature.first ?: throw InvalidSignatureException()
+        val transactionSignature = TransactionSignature(serializedSignature, chainId)
+        val recoveredPublicKey =
+            transactionSignature.recoverPublicKey(this) ?: throw InvalidSignatureException()
+        if (!publicKeyData.secureCompare(recoveredPublicKey)) {
+            throw InvalidPublicKeyException()
+        }
+        this.signature = transactionSignature
     }
-    this.signature = transactionSignature
 }
 
 fun Transaction.eip155sign(
@@ -47,28 +60,18 @@ fun Transaction.eip155sign(
         throw InvalidChainIdException()
     }
 
-    if (eipType == Transaction.EIPTransactionType.EIP712) {
-        (this as? Eip712Transaction)?.apply {
-            val signature = Eip712Utils.getHash(eip712Message).secp256k1RecoverableSign(privateKeyData)
-            val serialized = signature?.secp256k1SerializeSignature()!!
-            val rs = serialized.copyOfRange(0, 64)
-            val v = (serialized[64] + 27).toByte()
-            val normalized = rs + v
-            meta.customSignature = normalized
+    this.signature = null
+    val publicKey = privateKey.publicKey(true)?.data() ?: throw InvalidPublicKeyException()
+    val hash = this.hash(this.chainId, true) ?: throw InternalErrorException()
+    for (i in 0 until 1024) {
+        val signature = hash.secp256k1RecoverableSign(privateKeyData, extraEntropy) ?: continue
+        val recoveredPublicKey = signature.secp256k1RecoverPublicKey(hash, true) ?: continue
+        if (!recoveredPublicKey.secureCompare(publicKey)) {
+            continue
         }
-    } else {
-        this.signature = null
-        val publicKey = privateKey.publicKey(true)?.data() ?: throw InvalidPublicKeyException()
-        val hash = this.hash(this.chainId, true) ?: throw InternalErrorException()
-        for (i in 0 until 1024) {
-            val signature = hash.secp256k1RecoverableSign(privateKeyData, extraEntropy) ?: continue
-            val recoveredPublicKey = signature.secp256k1RecoverPublicKey(hash, true) ?: continue
-            if (!recoveredPublicKey.secureCompare(publicKey)) {
-                continue
-            }
-            val serializedSignature = signature.secp256k1SerializeSignature() ?: continue
-            return Pair(serializedSignature, signature)
-        }
+        val serializedSignature = signature.secp256k1SerializeSignature() ?: continue
+        return Pair(serializedSignature, signature)
     }
+
     return Pair(null, null)
 }
