@@ -19,8 +19,6 @@ class Address constructor(val address: String) : Parcelable {
         const val DEFAULT_API_CONTRACT = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
 
         const val DEFAULT_ZKSYNC_CONTRACT = "0x0000000000000000000000000000000000000000"
-        const val BUIDL_CONTRACT_ADDRESS = "0x4baB9ae28e0A45E3D6879190760C551c1E8d7F81"
-        const val BUIDL_PAYMASTER_ADDRESS = "0xAf4fFc0fd44d3844fc20E3cfc0FcDBFA93548e88"
 
         fun create(data: ByteArray, prefix: String? = null) = create(data.toHexString(), prefix)
 
@@ -45,7 +43,7 @@ class Address constructor(val address: String) : Parcelable {
         }
     }
 
-    fun isDefault() = address.isEmpty()
+    fun isDefault() = address.isEmpty() || address == DEFAULT_API_CONTRACT || address == DEFAULT_ZKSYNC_CONTRACT
 
     override fun toString() = address
 
