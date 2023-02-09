@@ -17,8 +17,8 @@ import java.math.BigInteger
 @Parcelize
 class Eip712Transaction(
     override var nonce: BigInteger = BigInteger.ZERO,
-    val maxPriorityFeePerErg: BigInteger = BigInteger.ZERO,
-    val maxFeePerErg: BigInteger = BigInteger.ZERO,
+    val maxPriorityFeePerGas: BigInteger = BigInteger.ZERO,
+    val maxFeePerGas: BigInteger = BigInteger.ZERO,
     var meta: Meta = Meta(),
     override var gasLimit: BigInteger = BigInteger.ZERO,
     override var to: Address?,
@@ -56,15 +56,15 @@ class Eip712Transaction(
                 addProperty("txType", eipType.data.first().toInt())
                 addProperty("from", from?.address ?: "0x")
                 addProperty("to", to?.address ?: "0x")
-                addProperty("ergsLimit", ergsLimit.toHexString().addHexPrefix())
+                addProperty("gasLimit", gasLimit.toHexString().addHexPrefix())
                 addProperty(
-                    "ergsPerPubdataByteLimit",
-                    meta.ergsPerPubdata.toHexString().addHexPrefix()
+                    "gasPerPubdataByteLimit",
+                    meta.gasPerPubdata.toHexString().addHexPrefix()
                 )
-                addProperty("maxFeePerErg", maxFeePerErg.toHexString().addHexPrefix())
+                addProperty("maxFeePerGas", maxFeePerGas.toHexString().addHexPrefix())
                 addProperty(
-                    "maxPriorityFeePerErg",
-                    maxPriorityFeePerErg.toHexString().addHexPrefix()
+                    "maxPriorityFeePerGas",
+                    maxPriorityFeePerGas.toHexString().addHexPrefix()
                 )
                 addProperty("paymaster", meta.paymaster?.paymaster?.address ?: "0x")
                 addProperty("nonce", nonce.toHexString().addHexPrefix())
@@ -106,10 +106,10 @@ class Eip712Transaction(
                     add(type("txType", "uint256"))
                     add(type("from", "uint256"))
                     add(type("to", "uint256"))
-                    add(type("ergsLimit", "uint256"))
-                    add(type("ergsPerPubdataByteLimit", "uint256"))
-                    add(type("maxFeePerErg", "uint256"))
-                    add(type("maxPriorityFeePerErg", "uint256"))
+                    add(type("gasLimit", "uint256"))
+                    add(type("gasPerPubdataByteLimit", "uint256"))
+                    add(type("maxFeePerGas", "uint256"))
+                    add(type("maxPriorityFeePerGas", "uint256"))
                     add(type("paymaster", "uint256"))
                     add(type("nonce", "uint256"))
                     add(type("value", "uint256"))
@@ -162,19 +162,19 @@ class Eip712Transaction(
             "type":"uint256"
          },
          {
-            "name":"ergsLimit",
+            "name":"gasLimit",
             "type":"uint256"
          },
          {
-            "name":"ergsPerPubdataByteLimit",
+            "name":"gasPerPubdataByteLimit",
             "type":"uint256"
          },
          {
-            "name":"maxFeePerErg",
+            "name":"maxFeePerGas",
             "type":"uint256"
          },
          {
-            "name":"maxPriorityFeePerErg",
+            "name":"maxPriorityFeePerGas",
             "type":"uint256"
          },
          {
@@ -209,7 +209,7 @@ class Eip712Transaction(
 
     @Parcelize
     data class Meta(
-        var ergsPerPubdata: BigInteger = BigInteger("160000"), //DEFAULT_ERGS_PER_PUBDATA_LIMIT
+        var gasPerPubdata: BigInteger = BigInteger("800"), //DEFAULT_GAS_PER_PUBDATA_LIMIT
         var customSignature: ByteArray? = null,
         val paymaster: Paymaster? = null,
         val factoryDeps: Array<ByteArray>? = null
@@ -220,7 +220,7 @@ class Eip712Transaction(
 
             other as Meta
 
-            if (ergsPerPubdata != other.ergsPerPubdata) return false
+            if (gasPerPubdata != other.gasPerPubdata) return false
             if (customSignature != null) {
                 if (other.customSignature == null) return false
                 if (!customSignature.contentEquals(other.customSignature)) return false
@@ -235,7 +235,7 @@ class Eip712Transaction(
         }
 
         override fun hashCode(): Int {
-            var result = ergsPerPubdata.hashCode()
+            var result = gasPerPubdata.hashCode()
             result = 31 * result + (customSignature?.contentHashCode() ?: 0)
             result = 31 * result + (paymaster?.hashCode() ?: 0)
             result = 31 * result + (factoryDeps?.contentDeepHashCode() ?: 0)
@@ -314,16 +314,12 @@ class Eip712Transaction(
         }
     }
 
-
-    private val ergsLimit: BigInteger
-        get() = gasLimit
-
     constructor(
         nonce: ByteArray = byteArrayOf(0x00),
-        maxPriorityFeePerErg: ByteArray = byteArrayOf(0x00),
-        maxFeePerErg: ByteArray = byteArrayOf(0x00),
+        maxPriorityFeePerGas: ByteArray = byteArrayOf(0x00),
+        maxFeePerGas: ByteArray = byteArrayOf(0x00),
         meta: Meta = Meta(),
-        ergsLimit: ByteArray = byteArrayOf(0x00),
+        gasLimit: ByteArray = byteArrayOf(0x00),
         to: Address?,
         value: ByteArray = byteArrayOf(0x00),
         data: ByteArray = byteArrayOf(0x00),
@@ -333,10 +329,10 @@ class Eip712Transaction(
         currency: TransactionCurrency? = null
     ) : this(
         nonce.toBigInteger(),
-        maxPriorityFeePerErg.toBigInteger(),
-        maxFeePerErg.toBigInteger(),
+        maxPriorityFeePerGas.toBigInteger(),
+        maxFeePerGas.toBigInteger(),
         meta,
-        ergsLimit.toBigInteger(),
+        gasLimit.toBigInteger(),
         to,
         value.toBigInteger(),
         data,
@@ -348,10 +344,10 @@ class Eip712Transaction(
 
     constructor(
         nonce: String = "0x00",
-        maxPriorityFeePerErg: String = "0x00",
-        maxFeePerErg: String = "0x00",
+        maxPriorityFeePerGas: String = "0x00",
+        maxFeePerGas: String = "0x00",
         meta: Meta = Meta(),
-        ergsLimit: String = "0x00",
+        gasLimit: String = "0x00",
         to: Address?,
         value: String = "0x00",
         data: ByteArray,
@@ -361,10 +357,10 @@ class Eip712Transaction(
         currency: TransactionCurrency? = null
     ) : this(
         nonce.hexToBigInteger(),
-        maxPriorityFeePerErg.hexToBigInteger(),
-        maxFeePerErg.hexToBigInteger(),
+        maxPriorityFeePerGas.hexToBigInteger(),
+        maxFeePerGas.hexToBigInteger(),
         meta,
-        ergsLimit.hexToBigInteger(),
+        gasLimit.hexToBigInteger(),
         to,
         value.hexToBigInteger(),
         data,
@@ -378,8 +374,8 @@ class Eip712Transaction(
         var description = "Transaction\n"
         description += "EIPType: " + eipType.data.toHexString() + "\n"
         description += "Nonce: " + nonce.toHexStringWithoutLeadingZeroByte() + "\n"
-        description += "Max Priority Fee Per Gas: " + maxPriorityFeePerErg.toHexStringWithoutLeadingZeroByte() + "\n"
-        description += "Max Fee Per Gas: " + maxFeePerErg.toHexStringWithoutLeadingZeroByte() + "\n"
+        description += "Max Priority Fee Per Gas: " + maxPriorityFeePerGas.toHexStringWithoutLeadingZeroByte() + "\n"
+        description += "Max Fee Per Gas: " + maxFeePerGas.toHexStringWithoutLeadingZeroByte() + "\n"
         description += "Meta: $meta\n"
         description += "Gas Limit: " + gasLimit.toHexStringWithoutLeadingZeroByte() + "\n"
         description += "From: $from\n"
@@ -394,8 +390,8 @@ class Eip712Transaction(
 
     //
     // Creates and returns rlp array with order:
-    // RLP([nonce, maxPriorityFeePerErg, maxFeePerErg, ergsLimit, to? || "", value, input,
-    // (signatureYParity, signatureR, signatureS) || (chainID, "", ""), chainID, from, ergPerPubdata,
+    // RLP([nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to? || "", value, input,
+    // (signatureYParity, signatureR, signatureS) || (chainID, "", ""), chainID, from, gasPerPubdata,
     // factoryDeps || [], customSignature || Data(), [paymaster, paymasterInput] || []])
     //
     override fun rlpData(chainId: BigInteger?, forSignature: Boolean): RlpArray {
@@ -404,14 +400,14 @@ class Eip712Transaction(
         }
 
         // 1: nonce
-        // 2: maxPriorityFeePerErg
-        // 3: maxFeePerErg
-        // 4: ergsLimit
+        // 2: maxPriorityFeePerGas
+        // 3: maxFeePerGas
+        // 4: gasLimit
         val fields = mutableListOf<Rlp>(
             nonce.toRlp(),
-            maxPriorityFeePerErg.toRlp(),
-            maxFeePerErg.toRlp(),
-            ergsLimit.toRlp()
+            maxPriorityFeePerGas.toRlp(),
+            maxFeePerGas.toRlp(),
+            gasLimit.toRlp()
         )
 
         // 5: to || 0x
@@ -443,10 +439,10 @@ class Eip712Transaction(
         }
         // 9: chainID
         // 10: from
-        // 11: ergsPerPubdata
+        // 11: gasPerPubdata
         fields.add(chainId.toRlp())
         fields.add(RlpString(from!!.address))
-        fields.add(meta.ergsPerPubdata.toRlp())
+        fields.add(meta.gasPerPubdata.toRlp())
 
         // 12: factoryDeps
         fields.add((meta.factoryDeps ?: RlpArray()) as RlpArray)

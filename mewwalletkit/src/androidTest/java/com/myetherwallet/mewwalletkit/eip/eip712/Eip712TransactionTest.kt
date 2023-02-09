@@ -5,6 +5,7 @@ import com.myetherwallet.mewwalletkit.bip.bip44.Network
 import com.myetherwallet.mewwalletkit.bip.bip44.PrivateKey
 import com.myetherwallet.mewwalletkit.core.extension.eip155sign
 import com.myetherwallet.mewwalletkit.core.extension.hexToByteArray
+import com.myetherwallet.mewwalletkit.core.extension.sign
 import com.myetherwallet.mewwalletkit.core.extension.toHexString
 import com.myetherwallet.mewwalletkit.eip.eip681.AbiFunction
 import org.json.JSONObject
@@ -61,8 +62,8 @@ class Eip712TransactionTest {
 
         val transaction = Eip712Transaction(
             nonce = BigInteger("0"),
-            maxPriorityFeePerErg = BigInteger("100000000"),
-            maxFeePerErg = BigInteger("100000000"),
+            maxPriorityFeePerGas = BigInteger("100000000"),
+            maxFeePerGas = BigInteger("100000000"),
             gasLimit = BigInteger("5000000"),
             from = privateKey.address(),
             to = privateKey.address(),
@@ -70,12 +71,12 @@ class Eip712TransactionTest {
             chainId = BigInteger("280")
         )
 
-        transaction.eip155sign(privateKey)
+        transaction.sign(privateKey)
 
         val expectedCustomSignature =
-            "54761417b8b9ad2395901586b60139bd0cfcc2f99b182fee75a65551c9d7063c56d0369dd68c3150a87d31cdae42b9b00e18ac99e0c85318296e64b4a3cd3fbc1b"
+            "8ab421f3cfacd51e08054c79db85525d082cff45484c0cc4031d85b95b81377c16e4b6666077d456cad752acd3c0ebf403938012746517262f8e97591de3a2591c"
         val expectedSerializedTransaction =
-            "71f891808405f5e1008405f5e100834c4b4094dc544d1aa88ff8bbd2f2aec754b1f1e99e1812fd85e8d4a5100080820118808082011894dc544d1aa88ff8bbd2f2aec754b1f1e99e1812fd83027100c0b84154761417b8b9ad2395901586b60139bd0cfcc2f99b182fee75a65551c9d7063c56d0369dd68c3150a87d31cdae42b9b00e18ac99e0c85318296e64b4a3cd3fbc1bc0"
+            "71f890808405f5e1008405f5e100834c4b4094dc544d1aa88ff8bbd2f2aec754b1f1e99e1812fd85e8d4a5100080820118808082011894dc544d1aa88ff8bbd2f2aec754b1f1e99e1812fd820320c0b8418ab421f3cfacd51e08054c79db85525d082cff45484c0cc4031d85b95b81377c16e4b6666077d456cad752acd3c0ebf403938012746517262f8e97591de3a2591cc0"
 
         assertEquals(expectedCustomSignature, transaction.meta.customSignature?.toHexString())
         assertEquals(expectedSerializedTransaction, transaction.serialize()?.toHexString())
@@ -91,8 +92,8 @@ class Eip712TransactionTest {
 
         val transaction = Eip712Transaction(
             nonce = BigInteger("0"),
-            maxPriorityFeePerErg = BigInteger("100000000"),
-            maxFeePerErg = BigInteger("100000000"),
+            maxPriorityFeePerGas = BigInteger("100000000"),
+            maxFeePerGas = BigInteger("100000000"),
             gasLimit = BigInteger("5000000"),
             from = privateKey.address(),
             to = privateKey.address(),
@@ -107,12 +108,12 @@ class Eip712TransactionTest {
             )
         )
 
-        transaction.eip155sign(privateKey)
+        transaction.sign(privateKey)
 
         val expectedCustomSignature =
-            "43e0371c523a089bda9024ae0ca175138b70124e6100b063d8e952f14a5bb8d90cdf4e693007ac90b612d27e09a25e0ba7761c3f06d9d8a869f2f612b2ce5dd01c"
+            "b882c515ee8a55a2ff6b8b970cf7eb4fdcd38895ff621416555f1d51eafe23cd47c14d498a32b73a9a73cfae2c64d4476987ca9bfea4096f2fbcd558927fe0a01b"
         val expectedSerializedTransaction =
-            "71f8cf808405f5e1008405f5e100834c4b4094dc544d1aa88ff8bbd2f2aec754b1f1e99e1812fd85e8d4a5100080820118808082011894dc544d1aa88ff8bbd2f2aec754b1f1e99e1812fd83027100c0b84143e0371c523a089bda9024ae0ca175138b70124e6100b063d8e952f14a5bb8d90cdf4e693007ac90b612d27e09a25e0ba7761c3f06d9d8a869f2f612b2ce5dd01cf83d940265d9a5af8af5fe070933e5e549d8fef08e09f4a78c5a34450000000000000000000000000000000000000000000000000000000000000020aabbcc"
+            "71f8ce808405f5e1008405f5e100834c4b4094dc544d1aa88ff8bbd2f2aec754b1f1e99e1812fd85e8d4a5100080820118808082011894dc544d1aa88ff8bbd2f2aec754b1f1e99e1812fd820320c0b841b882c515ee8a55a2ff6b8b970cf7eb4fdcd38895ff621416555f1d51eafe23cd47c14d498a32b73a9a73cfae2c64d4476987ca9bfea4096f2fbcd558927fe0a01bf83d940265d9a5af8af5fe070933e5e549d8fef08e09f4a78c5a34450000000000000000000000000000000000000000000000000000000000000020aabbcc"
 
         val customSignatureResult = transaction.meta.customSignature?.toHexString()
         val serializedTransactionResult = transaction.serialize()?.toHexString()
