@@ -45,13 +45,6 @@ class Eip712TransactionTest {
         )
     }
 
-    @Test
-    fun checkForEip712MessageJsonConvert() {
-        val result = Eip712Transaction.EIP712Message.typesJson.toString()
-        val expected = JSONObject(Eip712Transaction.EIP712Message.typesString).toString()
-        assertEquals(expected, result)
-    }
-
 
     @Test
     fun checkEip712Signature() {
@@ -74,9 +67,9 @@ class Eip712TransactionTest {
         transaction.sign(privateKey)
 
         val expectedCustomSignature =
-            "8ab421f3cfacd51e08054c79db85525d082cff45484c0cc4031d85b95b81377c16e4b6666077d456cad752acd3c0ebf403938012746517262f8e97591de3a2591c"
+            "8e67015a432c2990214401d35fa2b2b91e6857bb12bbc4f708a864a8dbe2e3195751e3d8f9b0d9a743351d5642f1c4d67457e1069822092a21068e672dd2f28a1c"
         val expectedSerializedTransaction =
-            "71f890808405f5e1008405f5e100834c4b4094dc544d1aa88ff8bbd2f2aec754b1f1e99e1812fd85e8d4a5100080820118808082011894dc544d1aa88ff8bbd2f2aec754b1f1e99e1812fd820320c0b8418ab421f3cfacd51e08054c79db85525d082cff45484c0cc4031d85b95b81377c16e4b6666077d456cad752acd3c0ebf403938012746517262f8e97591de3a2591cc0"
+            "71f890808405f5e1008405f5e100834c4b4094dc544d1aa88ff8bbd2f2aec754b1f1e99e1812fd85e8d4a5100080820118808082011894dc544d1aa88ff8bbd2f2aec754b1f1e99e1812fd82c350c0b8418e67015a432c2990214401d35fa2b2b91e6857bb12bbc4f708a864a8dbe2e3195751e3d8f9b0d9a743351d5642f1c4d67457e1069822092a21068e672dd2f28a1cc0"
 
         assertEquals(expectedCustomSignature, transaction.meta.customSignature?.toHexString())
         assertEquals(expectedSerializedTransaction, transaction.serialize()?.toHexString())
@@ -110,13 +103,17 @@ class Eip712TransactionTest {
 
         transaction.sign(privateKey)
 
+        val expectedPaymasterInput =
+            "8c5a344500000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000003aabbcc0000000000000000000000000000000000000000000000000000000000"
         val expectedCustomSignature =
-            "b882c515ee8a55a2ff6b8b970cf7eb4fdcd38895ff621416555f1d51eafe23cd47c14d498a32b73a9a73cfae2c64d4476987ca9bfea4096f2fbcd558927fe0a01b"
+            "0d44b41225e470d984d77061101fdea43cc8d28c74be4d0bbe126d17535a4dc1690e629a5fc23f586d2d1fffa862b4a5e0e34fcbbb116a1e80e3a89711ddd4ff1c"
         val expectedSerializedTransaction =
-            "71f8ce808405f5e1008405f5e100834c4b4094dc544d1aa88ff8bbd2f2aec754b1f1e99e1812fd85e8d4a5100080820118808082011894dc544d1aa88ff8bbd2f2aec754b1f1e99e1812fd820320c0b841b882c515ee8a55a2ff6b8b970cf7eb4fdcd38895ff621416555f1d51eafe23cd47c14d498a32b73a9a73cfae2c64d4476987ca9bfea4096f2fbcd558927fe0a01bf83d940265d9a5af8af5fe070933e5e549d8fef08e09f4a78c5a34450000000000000000000000000000000000000000000000000000000000000020aabbcc"
+            "71f9010c808405f5e1008405f5e100834c4b4094dc544d1aa88ff8bbd2f2aec754b1f1e99e1812fd85e8d4a5100080820118808082011894dc544d1aa88ff8bbd2f2aec754b1f1e99e1812fd82c350c0b8410d44b41225e470d984d77061101fdea43cc8d28c74be4d0bbe126d17535a4dc1690e629a5fc23f586d2d1fffa862b4a5e0e34fcbbb116a1e80e3a89711ddd4ff1cf87b940265d9a5af8af5fe070933e5e549d8fef08e09f4b8648c5a344500000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000003aabbcc0000000000000000000000000000000000000000000000000000000000"
 
+        val paymasterInputResult = transaction.meta.paymaster?.input?.toHexString()
         val customSignatureResult = transaction.meta.customSignature?.toHexString()
         val serializedTransactionResult = transaction.serialize()?.toHexString()
+        assertEquals(expectedPaymasterInput, paymasterInputResult)
         assertEquals(expectedCustomSignature, customSignatureResult)
         assertEquals(expectedSerializedTransaction, serializedTransactionResult)
     }

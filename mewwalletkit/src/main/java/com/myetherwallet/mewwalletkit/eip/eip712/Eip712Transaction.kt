@@ -209,7 +209,7 @@ class Eip712Transaction(
 
     @Parcelize
     data class Meta(
-        var gasPerPubdata: BigInteger = BigInteger("800"), //DEFAULT_GAS_PER_PUBDATA_LIMIT
+        var gasPerPubdata: BigInteger = BigInteger("50000"), //DEFAULT_GAS_PER_PUBDATA_LIMIT
         var customSignature: ByteArray? = null,
         val paymaster: Paymaster? = null,
         val factoryDeps: Array<ByteArray>? = null
