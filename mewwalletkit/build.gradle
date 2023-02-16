@@ -41,8 +41,8 @@ dependencies {
 
     implementation 'com.madgag.spongycastle:prov:1.58.0.0'
     implementation project(path: ':secp256k1')
-    implementation 'com.github.gnosis.bivrost-kotlin:bivrost-solidity-types:v0.6.2'
-    implementation 'com.github.gnosis.bivrost-kotlin:bivrost-abi-parser:v0.6.2'
+    implementation 'com.github.gnosis.bivrost-kotlin:bivrost-solidity-types:v0.8.1'
+    implementation 'com.github.gnosis.bivrost-kotlin:bivrost-abi-parser:0.8.1'
     implementation 'com.github.gnosis.svalinn-kotlin:blockies:v0.5.4'
 
     implementation 'com.google.code.gson:gson:2.9.0'

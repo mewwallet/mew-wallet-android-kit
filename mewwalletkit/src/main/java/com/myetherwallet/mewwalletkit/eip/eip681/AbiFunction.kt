@@ -1,6 +1,10 @@
 package com.myetherwallet.mewwalletkit.eip.eip681
 
+import com.myetherwallet.mewwalletkit.core.extension.hexToByteArray
+import com.myetherwallet.mewwalletkit.core.extension.keccak256
 import com.myetherwallet.mewwalletkit.eip.eip67.AbiDecoder
+import pm.gnosis.model.SolidityBase
+
 
 /**
  * Created by BArtWell on 23.09.2021.
@@ -15,6 +19,16 @@ data class AbiFunction(
 ) {
 
     val erc20transfer = Method.ERC20_TRANSFER
+
+    private val signature: String
+        get() = "${functionName}(${inputs.joinToString(",") { it.second }})"
+
+    private val methodEncoding: ByteArray
+        get() = signature.toByteArray(Charsets.US_ASCII).keccak256().take(4).toByteArray()
+
+    fun encodeParameters(params: List<SolidityBase.Type>): ByteArray {
+        return methodEncoding + SolidityBase.encodeTuple(params).hexToByteArray()
+    }
 
     fun decodeInputData(rawData: ByteArray): Map<String, Any>? {
         var data = rawData
