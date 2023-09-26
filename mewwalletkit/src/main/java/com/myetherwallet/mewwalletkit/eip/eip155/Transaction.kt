@@ -87,6 +87,7 @@ abstract class Transaction(
     enum class EIPTransactionType(val data: ByteArray) {
         EIP2930("0x01".hexToByteArray()),
         EIP1559("0x02".hexToByteArray()),
+        EIP712("0x71".hexToByteArray()),
         LEGACY("0x".hexToByteArray())
     }
 

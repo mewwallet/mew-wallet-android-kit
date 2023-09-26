@@ -41,7 +41,7 @@ class Address constructor(val address: String) : Parcelable {
         }
     }
 
-    fun isDefault() = address.isEmpty()
+    fun isDefault() = address.isEmpty() || address == DEFAULT_API_CONTRACT
 
     override fun toString() = address
 

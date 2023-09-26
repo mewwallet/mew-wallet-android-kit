@@ -9,6 +9,8 @@ import com.myetherwallet.mewwalletkit.eip.eip155.exception.InvalidChainIdExcepti
 import com.myetherwallet.mewwalletkit.eip.eip155.exception.InvalidPrivateKeyException
 import com.myetherwallet.mewwalletkit.eip.eip155.exception.InvalidPublicKeyException
 import com.myetherwallet.mewwalletkit.eip.eip155.exception.InvalidSignatureException
+import com.myetherwallet.mewwalletkit.eip.eip712.Eip712Transaction
+import com.myetherwallet.mewwalletkit.eip.eip712.Eip712Utils
 
 /**
  * Created by BArtWell on 13.06.2019.
@@ -21,18 +23,35 @@ fun Transaction.sign(key: PrivateKey, extraEntropy: Boolean = false) {
         this.chainId = key.network.chainId
     }
     val chainId = this.chainId ?: throw InvalidChainIdException()
-    val publicKeyData = key.publicKey()?.data() ?: throw InvalidPublicKeyException()
-    val signature = this.eip155sign(key, extraEntropy)
-    val serializedSignature = signature.first ?: throw InvalidSignatureException()
-    val transactionSignature = TransactionSignature(serializedSignature, chainId)
-    val recoveredPublicKey = transactionSignature.recoverPublicKey(this) ?: throw InvalidSignatureException()
-    if (!publicKeyData.secureCompare(recoveredPublicKey)) {
-        throw InvalidPublicKeyException()
+
+    if (eipType == Transaction.EIPTransactionType.EIP712) {
+        (this as? Eip712Transaction)?.apply {
+            val signature = Eip712Utils.getHash(eip712Message).secp256k1RecoverableSign(key.data())
+            val serialized = signature?.secp256k1SerializeSignature()!!
+            val rs = serialized.copyOfRange(0, 64)
+            val v = (serialized[64] + 27).toByte()
+            val normalized = rs + v
+            meta.customSignature = normalized
+        }
+    } else {
+
+        val publicKeyData = key.publicKey()?.data() ?: throw InvalidPublicKeyException()
+        val signature = this.eip155sign(key, extraEntropy)
+        val serializedSignature = signature.first ?: throw InvalidSignatureException()
+        val transactionSignature = TransactionSignature(serializedSignature, chainId)
+        val recoveredPublicKey =
+            transactionSignature.recoverPublicKey(this) ?: throw InvalidSignatureException()
+        if (!publicKeyData.secureCompare(recoveredPublicKey)) {
+            throw InvalidPublicKeyException()
+        }
+        this.signature = transactionSignature
     }
-    this.signature = transactionSignature
 }
 
-fun Transaction.eip155sign(privateKey: PrivateKey, extraEntropy: Boolean = false): Pair<ByteArray?, ByteArray?> {
+fun Transaction.eip155sign(
+    privateKey: PrivateKey,
+    extraEntropy: Boolean = false
+): Pair<ByteArray?, ByteArray?> {
     val privateKeyData = privateKey.data()
     if (!privateKeyData.secp256k1Verify()) {
         throw InvalidPrivateKeyException()
@@ -40,6 +59,7 @@ fun Transaction.eip155sign(privateKey: PrivateKey, extraEntropy: Boolean = false
     if (this.chainId == null) {
         throw InvalidChainIdException()
     }
+
     this.signature = null
     val publicKey = privateKey.publicKey(true)?.data() ?: throw InvalidPublicKeyException()
     val hash = this.hash(this.chainId, true) ?: throw InternalErrorException()
@@ -52,5 +72,6 @@ fun Transaction.eip155sign(privateKey: PrivateKey, extraEntropy: Boolean = false
         val serializedSignature = signature.secp256k1SerializeSignature() ?: continue
         return Pair(serializedSignature, signature)
     }
+
     return Pair(null, null)
 }

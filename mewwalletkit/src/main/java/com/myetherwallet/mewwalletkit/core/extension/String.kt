@@ -3,6 +3,7 @@ package com.myetherwallet.mewwalletkit.core.extension
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.util.*
+import java.util.zip.CRC32
 
 /**
  * Created by BArtWell on 21.05.2019.
@@ -132,3 +133,9 @@ fun String.decodeBase58(alphabet: String): ByteArray? {
 }
 
 fun String.hashPersonalMessage() = this.toByteArray().hashPersonalMessage()
+
+fun String.crc32(): String {
+    val crc = CRC32()
+    crc.update(this.toByteArray())
+    return String.format("%08X", crc.value)
+}

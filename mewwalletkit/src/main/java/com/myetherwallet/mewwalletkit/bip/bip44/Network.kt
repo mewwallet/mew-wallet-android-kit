@@ -48,6 +48,8 @@ sealed class Network(val title: String, val path: String, val chainId: BigIntege
     class CUSTOM(title: String, path: String, chainId: Int) : Network(title, path, chainId)
 
     object ANONYMIZED_ID : Network("Ethereum", "m/1000'/60'/0'/0", 1)
+    object PROFILE_ID : Network("Ethereum", "m/1000'/61'", 1)
+    object SAMSUNG_PROFILE_ID : Network("Ethereum", "m/1000'/60'", 1)
 
     fun wifPrefix() =
         when (this) {
