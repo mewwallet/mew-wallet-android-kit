@@ -3,11 +3,10 @@ apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-parcelize'
 
 android {
-    compileSdkVersion 33
-
     defaultConfig {
-        minSdkVersion 23
-        targetSdkVersion 33
+        minSdkVersion 24
+        compileSdk 33
+        targetSdkVersion 34
         versionCode 1
         versionName "1.0"
 
