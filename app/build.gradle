@@ -3,6 +3,7 @@ apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-android-extensions'
 
 android {
+    namespace 'com.myetherwallet.mewwalletkit'
     compileSdkVersion 28
     defaultConfig {
         applicationId "com.myetherwallet.mewwalletkitsample"
