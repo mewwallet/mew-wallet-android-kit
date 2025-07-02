@@ -5,9 +5,9 @@ android {
     ndkVersion "23.1.7779620"
 
     defaultConfig {
-        minSdkVersion 1
+        minSdkVersion 28
         compileSdk 33
-        targetSdkVersion 34
+        targetSdkVersion 35
         versionCode 1
         versionName "1.0"
 
@@ -20,7 +20,15 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_17
+    }
+    namespace 'com.myetherwallet.secp256k1'
+    testNamespace 'com.myetherwallet.secp256k1.test'
 }
 
 dependencies {
