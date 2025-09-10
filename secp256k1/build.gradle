@@ -2,12 +2,12 @@ apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
 android {
-    ndkVersion "23.1.7779620"
+    ndkVersion "26.1.10909125"
 
     defaultConfig {
-        minSdkVersion 28
+        minSdkVersion 29
         compileSdk 35
-        targetSdkVersion 35
+        targetSdkVersion 36
         versionCode 1
         versionName "1.0"
 
