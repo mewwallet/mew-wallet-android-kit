@@ -2,6 +2,7 @@ package com.myetherwallet.mewwalletkit.bip.bip44
 
 import com.myetherwallet.mewwalletkit.core.extension.*
 import org.bitcoin.NativeSecp256k1
+import io.github.novacrypto.base58.Base58
 import java.nio.ByteOrder
 
 /**
@@ -10,6 +11,7 @@ import java.nio.ByteOrder
 
 private const val PUBLIC_KEY_COMPRESSED_SIZE = 33
 private const val PUBLIC_KEY_DECOMPRESSED_SIZE = 65
+private const val SOLANA_PUBLIC_KEY_SIZE = 32
 
 class PublicKey : Key {
 
@@ -40,6 +42,20 @@ class PublicKey : Key {
 
     constructor(publicKey: ByteArray, compressed: Boolean = false, network: Network) {
         this.raw = publicKey
+        this.chainCode = ByteArray(0)
+        this.depth = 0
+        this.fingerprint = ByteArray(0)
+        this.index = 0
+        this.network = network
+    }
+
+    /**
+     * Constructor for Solana Ed25519 public keys
+     */
+    constructor(ed25519PublicKey: ByteArray, network: Network) {
+        require(network == Network.SOLANA) { "This constructor is only for Solana network" }
+        require(ed25519PublicKey.size == SOLANA_PUBLIC_KEY_SIZE) { "Solana public key must be 32 bytes" }
+        this.raw = ed25519PublicKey
         this.chainCode = ByteArray(0)
         this.depth = 0
         this.fingerprint = ByteArray(0)
@@ -80,6 +96,14 @@ class PublicKey : Key {
                 val stringAddress = data.encodeBase58String(alphabet) ?: return null
                 return Address.createRaw(stringAddress)
             }
+            Network.SOLANA -> {
+                if (raw.size != SOLANA_PUBLIC_KEY_SIZE) {
+                    return null
+                }
+                // For Solana, the public key bytes are directly used as the address
+                val base58Address = Base58.base58Encode(raw)
+                return Address.createRaw(base58Address)
+            }
             else -> {
                 if (raw.size != PUBLIC_KEY_DECOMPRESSED_SIZE) {
                     return null
@@ -89,6 +113,74 @@ class PublicKey : Key {
                 val addressData = formattedData.keccak256().takeLast(20).toByteArray()
                 val eip55 = addressData.eip55() ?: return null
                 return Address.create(eip55, network.addressPrefix())
+            }
+        }
+    }
+
+    /**
+     * Get Base58 encoded address for Solana
+     */
+    fun toSolanaBase58(): String? {
+        return if (network == Network.SOLANA && raw.size == SOLANA_PUBLIC_KEY_SIZE) {
+            Base58.base58Encode(raw)
+        } else null
+    }
+
+    /**
+     * Check if this is a Solana system program public key
+     */
+    fun isSolanaSystemProgram(): Boolean {
+        return network == Network.SOLANA &&
+               raw.size == SOLANA_PUBLIC_KEY_SIZE &&
+               raw.all { it == 0.toByte() }
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as PublicKey
+
+        if (!raw.contentEquals(other.raw)) return false
+        if (!chainCode.contentEquals(other.chainCode)) return false
+        if (depth != other.depth) return false
+        if (!fingerprint.contentEquals(other.fingerprint)) return false
+        if (index != other.index) return false
+        if (network != other.network) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = raw.contentHashCode()
+        result = 31 * result + chainCode.contentHashCode()
+        result = 31 * result + depth
+        result = 31 * result + fingerprint.contentHashCode()
+        result = 31 * result + index
+        result = 31 * result + network.hashCode()
+        return result
+    }
+
+    companion object {
+        /**
+         * Create PublicKey from Solana Base58 string
+         */
+        @JvmStatic
+        fun fromSolanaBase58(base58: String): PublicKey {
+            val bytes = Base58.base58Decode(base58)
+            return PublicKey(bytes, Network.SOLANA)
+        }
+
+        /**
+         * Validate Solana address format
+         */
+        @JvmStatic
+        fun isValidSolanaAddress(address: String): Boolean {
+            return try {
+                val decoded = Base58.base58Decode(address)
+                decoded.size == SOLANA_PUBLIC_KEY_SIZE
+            } catch (e: Exception) {
+                false
             }
         }
     }
