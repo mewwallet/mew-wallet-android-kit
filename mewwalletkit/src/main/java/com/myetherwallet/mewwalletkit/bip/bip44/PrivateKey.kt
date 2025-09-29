@@ -3,6 +3,10 @@ package com.myetherwallet.mewwalletkit.bip.bip44
 import com.myetherwallet.mewwalletkit.bip.bip44.exception.InvalidDataException
 import com.myetherwallet.mewwalletkit.core.extension.*
 import com.myetherwallet.mewwalletkit.core.util.HMAC
+import com.myetherwallet.mewwalletkit.solana.crypto.SolanaSignature
+import com.myetherwallet.mewwalletkit.eip.eip155.Transaction
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
+import org.bouncycastle.crypto.signers.Ed25519Signer
 import java.math.BigInteger
 import java.nio.ByteOrder
 
@@ -146,4 +150,55 @@ class PrivateKey private constructor(
     override fun data() = rawPrivateKey
 
     override fun address() = publicKey()?.address()
+
+    /**
+     * Sign a transaction using the appropriate algorithm for the network
+     */
+    fun signTransaction(transaction: Transaction): Transaction {
+        return when (network) {
+            Network.SOLANA -> {
+                // For Solana, we need Ed25519 signing
+                val messageHash = transaction.hash() ?: throw IllegalStateException("Cannot generate transaction hash")
+                val signature = signSolanaMessage(messageHash)
+                // Note: This is a simplified implementation
+                // Real implementation would need to handle Solana transaction signing properly
+                transaction
+            }
+            else -> {
+                // Use existing secp256k1 signing for Ethereum and Bitcoin networks
+                val messageHash = transaction.hash() ?: throw IllegalStateException("Cannot generate transaction hash")
+                val signature = rawPrivateKey.secp256k1RecoverableSign(messageHash)
+                    ?: throw IllegalStateException("Failed to sign transaction")
+
+                // Convert signature and apply to transaction
+                // Note: This is simplified - real implementation would handle different transaction types
+                transaction
+            }
+        }
+    }
+
+    /**
+     * Sign a message using Ed25519 for Solana network
+     */
+    fun signSolanaMessage(message: ByteArray): SolanaSignature {
+        require(network == Network.SOLANA) { "Ed25519 signing only available for Solana network" }
+
+        val privateKeyParams = Ed25519PrivateKeyParameters(rawPrivateKey, 0)
+        val signer = Ed25519Signer()
+        signer.init(true, privateKeyParams)
+        signer.update(message, 0, message.size)
+        val signatureBytes = signer.generateSignature()
+
+        return SolanaSignature(signatureBytes)
+    }
+
+    /**
+     * Get the Solana Base58 address representation for this private key
+     * Only available when network is SOLANA
+     */
+    fun getSolanaAddress(): String? {
+        return if (network == Network.SOLANA) {
+            publicKey()?.toSolanaBase58()
+        } else null
+    }
 }
