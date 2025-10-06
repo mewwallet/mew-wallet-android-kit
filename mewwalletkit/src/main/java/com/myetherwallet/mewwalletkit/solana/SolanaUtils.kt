@@ -1,8 +1,7 @@
 package com.myetherwallet.mewwalletkit.solana
 
 import com.myetherwallet.mewwalletkit.bip.bip44.PublicKey
-import com.myetherwallet.mewwalletkit.solana.crypto.SolanaPrivateKey
-import com.myetherwallet.mewwalletkit.solana.rpc.SolanaNetwork
+import io.github.novacrypto.base58.Base58
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.text.NumberFormat
@@ -139,7 +138,7 @@ object SolanaUtils {
         val parts = qrData.removePrefix("solana:").split("?")
         val address = parts[0]
 
-        if (!SolanaSDK.isValidAddress(address)) return null
+        if (!isValidSolanaAddress(address)) return null
 
         var amount: Double? = null
         var label: String? = null
@@ -160,31 +159,18 @@ object SolanaUtils {
         return SolanaQRData(address, amount, label)
     }
 
-    /**
-     * Get network display name
-     * @param network Solana network
-     * @return Human-readable network name
-     */
-    fun getNetworkDisplayName(network: SolanaNetwork): String {
-        return when (network) {
-            SolanaNetwork.MAINNET_BETA -> "Mainnet"
-            SolanaNetwork.DEVNET -> "Devnet"
-            SolanaNetwork.TESTNET -> "Testnet"
-            SolanaNetwork.LOCALHOST -> "Localhost"
-        }
-    }
 
     /**
-     * Get network color for UI (as hex string)
-     * @param network Solana network
-     * @return Hex color string
+     * Validate Solana address format
+     * @param address Solana address string
+     * @return true if valid address format
      */
-    fun getNetworkColor(network: SolanaNetwork): String {
-        return when (network) {
-            SolanaNetwork.MAINNET_BETA -> "#00D4AA" // Green
-            SolanaNetwork.DEVNET -> "#FF6B35" // Orange
-            SolanaNetwork.TESTNET -> "#4285F4" // Blue
-            SolanaNetwork.LOCALHOST -> "#9AA0A6" // Gray
+    fun isValidSolanaAddress(address: String): Boolean {
+        return try {
+            val decoded = Base58.base58Decode(address)
+            decoded.size == 32
+        } catch (e: Exception) {
+            false
         }
     }
 
@@ -244,7 +230,7 @@ object SolanaUtils {
      * Convert public key to various formats
      */
     object KeyFormats {
-        fun toBase58(publicKey: PublicKey): String = publicKey.toSolanaBase58()!!
+        fun toBase58(publicKey: PublicKey): String = publicKey.address()?.address ?: ""
         fun toHex(publicKey: PublicKey): String = publicKey.data().joinToString("") { "%02x".format(it) }
         fun toByteArray(publicKey: PublicKey): ByteArray = publicKey.data()
     }

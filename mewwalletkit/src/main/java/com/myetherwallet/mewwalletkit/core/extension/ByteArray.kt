@@ -188,3 +188,18 @@ fun ByteArray.hashPersonalMessage(): ByteArray {
 }
 
 fun ByteArray?.isNullOrEmpty() = this == null || this.isEmpty()
+
+/**
+ * Sign a message using Ed25519 for Solana network
+ * @param privateKey 32-byte Ed25519 private key
+ * @return Ed25519 signature (64 bytes)
+ */
+fun ByteArray.signSolanaMessage(privateKey: ByteArray): ByteArray {
+    require(privateKey.size == 32) { "Ed25519 private key must be 32 bytes" }
+
+    val privateKeyParams = org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters(privateKey, 0)
+    val signer = org.bouncycastle.crypto.signers.Ed25519Signer()
+    signer.init(true, privateKeyParams)
+    signer.update(this, 0, this.size)
+    return signer.generateSignature()
+}

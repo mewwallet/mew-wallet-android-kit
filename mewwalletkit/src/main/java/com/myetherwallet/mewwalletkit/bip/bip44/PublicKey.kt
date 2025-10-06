@@ -117,23 +117,7 @@ class PublicKey : Key {
         }
     }
 
-    /**
-     * Get Base58 encoded address for Solana
-     */
-    fun toSolanaBase58(): String? {
-        return if (network == Network.SOLANA && raw.size == SOLANA_PUBLIC_KEY_SIZE) {
-            Base58.base58Encode(raw)
-        } else null
-    }
 
-    /**
-     * Check if this is a Solana system program public key
-     */
-    fun isSolanaSystemProgram(): Boolean {
-        return network == Network.SOLANA &&
-               raw.size == SOLANA_PUBLIC_KEY_SIZE &&
-               raw.all { it == 0.toByte() }
-    }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -161,27 +145,4 @@ class PublicKey : Key {
         return result
     }
 
-    companion object {
-        /**
-         * Create PublicKey from Solana Base58 string
-         */
-        @JvmStatic
-        fun fromSolanaBase58(base58: String): PublicKey {
-            val bytes = Base58.base58Decode(base58)
-            return PublicKey(bytes, Network.SOLANA)
-        }
-
-        /**
-         * Validate Solana address format
-         */
-        @JvmStatic
-        fun isValidSolanaAddress(address: String): Boolean {
-            return try {
-                val decoded = Base58.base58Decode(address)
-                decoded.size == SOLANA_PUBLIC_KEY_SIZE
-            } catch (e: Exception) {
-                false
-            }
-        }
-    }
 }
