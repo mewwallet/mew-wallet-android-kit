@@ -174,21 +174,4 @@ class PrivateKey private constructor(
         }
     }
 
-    /**
-     * Get the Solana Base58 address representation for this private key
-     * Only available when network is SOLANA
-     */
-    fun getSolanaAddress(): String? {
-        return if (network == Network.SOLANA) {
-            address()?.address
-        } else null
-    }
 }
-
-
-/**
- * toSolanaBase58 - redundant
- * signSolanaMessage - ByteArray extension
- * remove all network interactions from MEWwalletKit (rpc, Solana network)
- * move all utils and extensions to other module
- */
