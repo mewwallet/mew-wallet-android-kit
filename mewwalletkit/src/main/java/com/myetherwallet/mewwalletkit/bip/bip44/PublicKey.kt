@@ -1,7 +1,7 @@
 package com.myetherwallet.mewwalletkit.bip.bip44
 
 import com.myetherwallet.mewwalletkit.core.extension.*
-import org.bitcoin.NativeSecp256k1
+import fr.acinq.secp256k1.Secp256k1
 import java.nio.ByteOrder
 
 /**
@@ -29,8 +29,12 @@ class PublicKey : Key {
         index: Int,
         network: Network
     ) {
-        val publicKey = NativeSecp256k1.computePublicKey(privateKey)!!
-        raw = NativeSecp256k1.serializePublicKey(publicKey, compressed)!!
+        val publicKey = Secp256k1.pubkeyCreate(privateKey)
+        raw = if (compressed) {
+            Secp256k1.pubKeyCompress(publicKey)
+        } else {
+            publicKey
+        }
         this.chainCode = chainCode
         this.depth = depth
         this.fingerprint = fingerprint

@@ -1,1 +1,1 @@
-include ':app', ':mewwalletkit', ':secp256k1'
+include ':app', ':mewwalletkit'
