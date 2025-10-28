@@ -71,8 +71,10 @@ class TransactionSignature(
             inferredChainID != null -> this.v - BigInteger.valueOf(35) - BigInteger.valueOf(2) * inferredChainID
             else -> this.v - BigInteger.valueOf(27)
         }
-        val rByteArray = this.rBytes.reversedArray()
-        val sByteArray = this.sBytes.reversedArray()
+        // rBytes and sBytes are now stored in BIG-endian format (for correct RLP encoding)
+        // secp256k1RecoverPublicKey expects BIG-endian, so pass them directly without reversing
+        val rByteArray = this.rBytes
+        val sByteArray = this.sBytes
 
         val vByteArray = if (normalizedV == BigInteger.ZERO) {
             byteArrayOf(0x00)

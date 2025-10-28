@@ -18,7 +18,8 @@ class ByteArrayKtTest2 {
     @Test
     fun secp256k1ParseSignature() {
         val data = "98ff921201554726367d2be8c804a7ff89ccf285ebc57dff8ae4c44b9c19ac4a1887321be575c8095f789dd4c743dfe42c1820f9231f98a962b210e3ac2452a301".hexToByteArray()
-        val expected = "4aac199c4bc4e48aff7dc5eb85f2cc89ffa704c8e82b7d36264755011292ff98a35224ace310b262a9981f23f920182ce4df43c7d49d785f09c875e51b32871801".hexToByteArray()
+        // secp256k1ParseSignature now returns input as-is (BIG-endian format)
+        val expected = data
         Assert.assertArrayEquals(expected, data.secp256k1ParseSignature())
     }
 
@@ -32,10 +33,48 @@ class ByteArrayKtTest2 {
 
     @Test
     fun secp256k1RecoverPublicKey() {
-        val data = "91e0ad336c23d84f757aa4cde2d0bb557daf5e1ca0a0b850b6431f3277fc167b".hexToByteArray()
+        // Test public key recovery from signature
+        val hash = "91e0ad336c23d84f757aa4cde2d0bb557daf5e1ca0a0b850b6431f3277fc167b".hexToByteArray()
         val privateKey = "3a0ce9a362c73439adb38c595e739539be1e34d19c5e9f04962c101c86bd7616".hexToByteArray()
-        val expected = "67584609593bba1bcd98f881354a3614aba0d2b734f3a7b023754345a89fff1f9e673669db43d35e764081e82cd9d6764698598d6f967e68f0ddee537f13151400".hexToByteArray()
-        Assert.assertArrayEquals(expected, data.secp256k1RecoverableSign(privateKey, false))
+
+        // Create a signature
+        val signature = hash.secp256k1RecoverableSign(privateKey, false)
+        Assert.assertNotNull("Signature should not be null", signature)
+
+        // Recover public key from signature (uncompressed)
+        val recoveredPublicKey = signature?.secp256k1RecoverPublicKey(hash, false)
+        Assert.assertNotNull("Recovered public key should not be null", recoveredPublicKey)
+
+        // Get actual public key from private key (uncompressed)
+        val expectedPublicKey = fr.acinq.secp256k1.Secp256k1.pubkeyCreate(privateKey)
+        Assert.assertNotNull("Expected public key should not be null", expectedPublicKey)
+
+        // Verify recovered public key matches expected
+        Assert.assertArrayEquals("Recovered public key should match expected", expectedPublicKey, recoveredPublicKey)
+
+        // Test compressed format
+        val recoveredCompressed = signature?.secp256k1RecoverPublicKey(hash, true)
+        val expectedCompressed = fr.acinq.secp256k1.Secp256k1.pubKeyCompress(expectedPublicKey)
+        Assert.assertArrayEquals("Recovered compressed public key should match expected", expectedCompressed, recoveredCompressed)
+    }
+
+    @Test
+    fun parsePublicKey() {
+        // Test parsing uncompressed public key (65 bytes: 0x04 + 32-byte x + 32-byte y)
+        val privateKey = "3a0ce9a362c73439adb38c595e739539be1e34d19c5e9f04962c101c86bd7616".hexToByteArray()
+        val uncompressedKey = fr.acinq.secp256k1.Secp256k1.pubkeyCreate(privateKey)
+
+        val parsedUncompressed = uncompressedKey.parsePublicKey()
+        Assert.assertArrayEquals("Parsed uncompressed key should match original", uncompressedKey, parsedUncompressed)
+
+        // Test parsing compressed public key (33 bytes: 0x02/0x03 + 32-byte x)
+        val compressedKey = fr.acinq.secp256k1.Secp256k1.pubKeyCompress(uncompressedKey)
+        val parsedCompressed = compressedKey.parsePublicKey()
+
+        // Parsing compressed key should return uncompressed format
+        Assert.assertNotNull("Parsed compressed key should not be null", parsedCompressed)
+        Assert.assertEquals("Parsed key should be uncompressed (65 bytes)", 65, parsedCompressed.size)
+        Assert.assertArrayEquals("Parsed compressed key should match original uncompressed", uncompressedKey, parsedCompressed)
     }
 
     @Test
