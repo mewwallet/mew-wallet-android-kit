@@ -189,7 +189,7 @@ class Eip712JsonParserTest {
 
         val membersArray = membersParam.value as Array712
         assertEquals("Array should have correct type", "Person[]", membersArray.typeName)
-        assertEquals("Array should have 2 members", 2, membersArray.values.size)
+        assertEquals("Array should have 2 members", 2, membersArray.parameters.size)
     }
 
     @Test
@@ -323,6 +323,9 @@ class Eip712JsonParserTest {
             types = mapOf(
                 "EIP712Domain" to listOf(
                     Eip712JsonAdapter.Parameter("name", "string")
+                ),
+                "Test" to listOf(
+                    Eip712JsonAdapter.Parameter("test", "string")
                 )
             ),
             primaryType = "Test",
@@ -466,7 +469,7 @@ class Eip712JsonParserTest {
         assertTrue("Parameter should be an array", arrayParam!!.value is Array712)
 
         val array = arrayParam.value as Array712
-        assertEquals("Array should be empty", 0, array.values.size)
+        assertEquals("Array should be empty", 0, array.parameters.size)
     }
 
     @Test
@@ -524,7 +527,7 @@ class Eip712JsonParserTest {
         assertTrue("Items should be an array", itemsParam!!.value is Array712)
 
         val itemsArray = itemsParam.value as Array712
-        assertEquals("Items array should have 2 elements", 2, itemsArray.values.size)
+        assertEquals("Items array should have 2 elements", 2, itemsArray.parameters.size)
     }
 
     /**
@@ -539,7 +542,7 @@ class Eip712JsonParserTest {
             domain: Map<String, Any>,
             message: Map<String, Any>
         ) {
-            mockResult = Eip712JsonAdapter.Result(types, primaryType, domain, message)
+            mockResult = Eip712JsonAdapter.Result(primaryType, domain, message, types)
         }
 
         override fun parse(json: String): Eip712JsonAdapter.Result {

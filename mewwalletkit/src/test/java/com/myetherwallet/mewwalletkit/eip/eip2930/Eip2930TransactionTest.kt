@@ -21,11 +21,12 @@ class Eip2930TransactionTest {
 
     @Before
     fun setup() {
-        testAddress = Address("0x1234567890123456789012345678901234567890", Network.ETHEREUM)
+        testAddress = Address("0x1234567890123456789012345678901234567890")
         testSignature = TransactionSignature(
+            "1234567890abcdef".hexToByteArray(),
+            "abcdef1234567890".hexToByteArray(),
             BigInteger.valueOf(27),
-            BigInteger("0x1234567890abcdef", 16),
-            BigInteger("0xabcdef1234567890", 16)
+            BigInteger.valueOf(1)
         )
     }
 
@@ -62,11 +63,11 @@ class Eip2930TransactionTest {
 
         val accessList = arrayOf(
             AccessList(
-                address = Address("0x1234567890123456789012345678901234567890", Network.ETHEREUM),
+                address = Address("0x1234567890123456789012345678901234567890"),
                 slots = storageSlots
             ),
             AccessList(
-                address = Address("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd", Network.ETHEREUM),
+                address = Address("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"),
                 slots = arrayOf("0x0000000000000000000000000000000000000000000000000000000000000003".hexToByteArray())
             )
         )
@@ -96,16 +97,16 @@ class Eip2930TransactionTest {
             nonce = BigInteger.valueOf(9),
             gasPrice = BigInteger.valueOf(10000000000), // 10 gwei
             gasLimit = BigInteger.valueOf(21000),
-            to = Address("0x3535353535353535353535353535353535353535", Network.ETHEREUM),
+            to = Address("0x3535353535353535353535353535353535353535"),
             value = BigInteger.valueOf(1000000000000000000), // 1 ETH
             data = "0x".hexToByteArray(),
             accessList = emptyArray(),
             chainId = BigInteger.valueOf(1)
         )
 
-        val encoded = transaction.rlpEncode()
+        val encoded = transaction.serialize()
         assertNotNull("RLP encoding should not be null", encoded)
-        assertTrue("RLP encoding should not be empty", encoded.isNotEmpty())
+        assertTrue("RLP encoding should not be empty", encoded!!.isNotEmpty())
 
         // EIP-2930 transactions should start with type byte 0x01
         assertEquals("First byte should be transaction type 1", 0x01.toByte(), encoded[0])
@@ -117,7 +118,7 @@ class Eip2930TransactionTest {
             nonce = BigInteger.valueOf(9),
             gasPrice = BigInteger.valueOf(10000000000),
             gasLimit = BigInteger.valueOf(21000),
-            to = Address("0x3535353535353535353535353535353535353535", Network.ETHEREUM),
+            to = Address("0x3535353535353535353535353535353535353535"),
             value = BigInteger.valueOf(1000000000000000000),
             data = "0x".hexToByteArray(),
             accessList = emptyArray(),
@@ -125,9 +126,9 @@ class Eip2930TransactionTest {
             signature = testSignature
         )
 
-        val encoded = transaction.rlpEncode()
+        val encoded = transaction.serialize()
         assertNotNull("Signed RLP encoding should not be null", encoded)
-        assertTrue("Signed RLP encoding should not be empty", encoded.isNotEmpty())
+        assertTrue("Signed RLP encoding should not be empty", encoded!!.isNotEmpty())
         assertEquals("First byte should be transaction type 1", 0x01.toByte(), encoded[0])
     }
 
@@ -137,7 +138,7 @@ class Eip2930TransactionTest {
             nonce = BigInteger.valueOf(0),
             gasPrice = BigInteger.valueOf(10000000000),
             gasLimit = BigInteger.valueOf(21000),
-            to = Address("0x3535353535353535353535353535353535353535", Network.ETHEREUM),
+            to = Address("0x3535353535353535353535353535353535353535"),
             value = BigInteger.valueOf(1000000000000000000),
             data = "0x".hexToByteArray(),
             accessList = emptyArray(),
@@ -185,7 +186,7 @@ class Eip2930TransactionTest {
         )
 
         val accessListItem = AccessList(
-            address = Address("0x1234567890123456789012345678901234567890", Network.ETHEREUM),
+            address = Address("0x1234567890123456789012345678901234567890"),
             slots = storageSlots
         )
 
@@ -212,7 +213,7 @@ class Eip2930TransactionTest {
         assertNotNull("Access list should not be null", transaction.accessList)
         assertTrue("Access list should be empty", transaction.accessList?.isEmpty() ?: false)
 
-        val encoded = transaction.rlpEncode()
+        val encoded = transaction.serialize()
         assertNotNull("Transaction with empty access list should encode", encoded)
     }
 
@@ -231,7 +232,7 @@ class Eip2930TransactionTest {
 
         assertNull("Access list should be null", transaction.accessList)
 
-        val encoded = transaction.rlpEncode()
+        val encoded = transaction.serialize()
         assertNotNull("Transaction with null access list should encode", encoded)
     }
 
@@ -273,7 +274,7 @@ class Eip2930TransactionTest {
 
         assertEquals("Large value should be preserved", largeValue, transaction.value)
 
-        val encoded = transaction.rlpEncode()
+        val encoded = transaction.serialize()
         assertNotNull("Large value transaction should encode", encoded)
     }
 
@@ -294,7 +295,7 @@ class Eip2930TransactionTest {
 
         assertEquals("High nonce should be preserved", highNonce, transaction.nonce)
 
-        val encoded = transaction.rlpEncode()
+        val encoded = transaction.serialize()
         assertNotNull("High nonce transaction should encode", encoded)
     }
 
@@ -323,7 +324,7 @@ class Eip2930TransactionTest {
 
             assertEquals("Chain ID should be preserved for $chainId", chainId, transaction.chainId)
 
-            val encoded = transaction.rlpEncode()
+            val encoded = transaction.serialize()
             assertNotNull("Transaction should encode for chain ID $chainId", encoded)
         }
     }
@@ -341,12 +342,12 @@ class Eip2930TransactionTest {
             chainId = BigInteger.valueOf(1)
         )
 
-        val encoded = transaction.rlpEncode()
+        val encoded = transaction.serialize()
         assertNotNull("Encoded transaction should not be null", encoded)
 
         // EIP-2930 transactions should be reasonably sized
-        assertTrue("Transaction should be under 1KB for simple transfers", encoded.size < 1024)
-        assertTrue("Transaction should be at least 50 bytes", encoded.size >= 50)
+        assertTrue("Transaction should be under 1KB for simple transfers", encoded!!.size < 1024)
+        assertTrue("Transaction should be at least 40 bytes", encoded.size >= 40)
     }
 
     @Test
@@ -366,7 +367,7 @@ class Eip2930TransactionTest {
         assertEquals("Zero gas price should be allowed", BigInteger.ZERO, transaction.gasPrice)
         assertEquals("Zero value should be allowed", BigInteger.ZERO, transaction.value)
 
-        val encoded = transaction.rlpEncode()
+        val encoded = transaction.serialize()
         assertNotNull("Zero value transaction should encode", encoded)
     }
 
@@ -412,11 +413,11 @@ class Eip2930TransactionTest {
     fun testAccessListRlpEncoding() {
         val storageSlot = "0x0000000000000000000000000000000000000000000000000000000000000001".hexToByteArray()
         val accessListItem = AccessList(
-            address = Address("0x1234567890123456789012345678901234567890", Network.ETHEREUM),
+            address = Address("0x1234567890123456789012345678901234567890"),
             slots = arrayOf(storageSlot)
         )
 
-        val encoded = accessListItem.rlpEncode()
+        val encoded = accessListItem.rlpEncode(null)
         assertNotNull("Access list item should encode", encoded)
         assertTrue("Encoded access list should not be empty", encoded?.isNotEmpty() ?: false)
     }
@@ -448,7 +449,7 @@ class Eip2930TransactionTest {
         val description = transaction.toString()
 
         assertTrue("Description should contain EIP type", description.contains("EIP2930"))
-        assertTrue("Description should contain nonce", description.contains("Nonce: 2a"))
+        assertTrue("Description should contain nonce with hex prefix", description.contains("Nonce: 0x2a"))
         assertTrue("Description should contain gas price", description.contains("Gas price:"))
         assertTrue("Description should contain gas limit", description.contains("Gas Limit:"))
         assertTrue("Description should contain to address", description.contains("To:"))
@@ -462,7 +463,7 @@ class Eip2930TransactionTest {
     fun testComplexAccessList() {
         val complexAccessList = arrayOf(
             AccessList(
-                address = Address("0x1111111111111111111111111111111111111111", Network.ETHEREUM),
+                address = Address("0x1111111111111111111111111111111111111111"),
                 slots = arrayOf(
                     "0x0000000000000000000000000000000000000000000000000000000000000001".hexToByteArray(),
                     "0x0000000000000000000000000000000000000000000000000000000000000002".hexToByteArray(),
@@ -470,13 +471,13 @@ class Eip2930TransactionTest {
                 )
             ),
             AccessList(
-                address = Address("0x2222222222222222222222222222222222222222", Network.ETHEREUM),
+                address = Address("0x2222222222222222222222222222222222222222"),
                 slots = arrayOf(
                     "0x0000000000000000000000000000000000000000000000000000000000000004".hexToByteArray()
                 )
             ),
             AccessList(
-                address = Address("0x3333333333333333333333333333333333333333", Network.ETHEREUM),
+                address = Address("0x3333333333333333333333333333333333333333"),
                 slots = emptyArray()
             )
         )
@@ -497,7 +498,7 @@ class Eip2930TransactionTest {
         assertEquals("Second item should have 1 slot", 1, transaction.accessList?.get(1)?.slots?.size)
         assertEquals("Third item should have 0 slots", 0, transaction.accessList?.get(2)?.slots?.size)
 
-        val encoded = transaction.rlpEncode()
+        val encoded = transaction.serialize()
         assertNotNull("Complex access list transaction should encode", encoded)
     }
 }

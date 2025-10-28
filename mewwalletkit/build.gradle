@@ -67,7 +67,6 @@ dependencies {
 
     // Solana Dependencies - Using Bouncy Castle for Ed25519
     implementation 'org.bouncycastle:bcprov-jdk18on:1.77'
-    implementation 'io.github.novacrypto:Base58:2022.01.17'
 
     // Testing
     testImplementation "junit:junit:$junit_version"

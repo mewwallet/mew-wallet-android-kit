@@ -178,7 +178,7 @@ class StringKtTest {
 
         // Test leading zeros
         assertArrayEquals("Leading zeros should be preserved",
-                         byteArrayOf(0x00, 0x00, 0x00, 0x01), "1112g".decodeBase58(alphabet))
+                         byteArrayOf(0x00, 0x00, 0x00, 0x61), "1112g".decodeBase58(alphabet))
 
         // Test known vectors
         val testVectors = mapOf(

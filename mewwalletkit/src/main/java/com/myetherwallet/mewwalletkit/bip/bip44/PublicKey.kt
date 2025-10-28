@@ -104,7 +104,8 @@ class PublicKey : Key {
                     return null
                 }
                 // For Solana, the public key bytes are directly used as the address
-                val base58Address = Base58.base58Encode(raw)
+                val alphabet = Network.SOLANA.alphabet() ?: return null
+                val base58Address = raw.encodeBase58String(alphabet) ?: return null
                 return Address.createRaw(base58Address)
             }
             else -> {

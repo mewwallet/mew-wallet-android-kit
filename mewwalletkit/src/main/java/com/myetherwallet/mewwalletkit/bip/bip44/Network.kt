@@ -49,6 +49,7 @@ sealed class Network(val title: String, val path: String, val chainId: BigIntege
     class CUSTOM(title: String, path: String, chainId: Int) : Network(title, path, chainId)
 
     object ANONYMIZED_ID : Network("Ethereum", "m/1000'/60'/0'/0", 1)
+    object SOLANA_ANONYMIZED_ID : Network("Solana", "m/1080'/60'/0'/0", 501, "sol")
     object PROFILE_ID : Network("Ethereum", "m/1000'/61'", 1)
     object SAMSUNG_PROFILE_ID : Network("Ethereum", "m/1000'/60'", 1)
 
@@ -75,7 +76,7 @@ sealed class Network(val title: String, val path: String, val chainId: BigIntege
 
     fun alphabet() =
         when (this) {
-            BITCOIN -> "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+            BITCOIN, LITECOIN, SOLANA, SOLANA_ANONYMIZED_ID -> "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
             else -> null
         }
 
@@ -98,6 +99,12 @@ sealed class Network(val title: String, val path: String, val chainId: BigIntege
             BITCOIN, LITECOIN -> true
             ETHEREUM, ROPSTEN -> false
             else -> false
+        }
+
+    fun seedKey() =
+        when (this) {
+            SOLANA, SOLANA_ANONYMIZED_ID -> "ed25519 seed".toByteArray()
+            else -> byteArrayOf(0x42, 0x69, 0x74, 0x63, 0x6F, 0x69, 0x6E, 0x20, 0x73, 0x65, 0x65, 0x64)
         }
 
     companion object {

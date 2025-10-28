@@ -235,6 +235,24 @@ fun ByteArray.hashPersonalMessage(): ByteArray {
 fun ByteArray?.isNullOrEmpty() = this == null || this.isEmpty()
 
 /**
+ * Generate Ed25519 keypair from 32-byte seed
+ * @return Pair of (32-byte private key, 32-byte public key)
+ */
+fun ByteArray.generateEd25519KeyPair(): Pair<ByteArray, ByteArray> {
+    require(this.size == 32) { "Ed25519 seed must be 32 bytes" }
+
+    // Ed25519 keypair generation from seed (matching TweetNacl behavior)
+    // The seed is hashed with SHA-512, then the private scalar is derived from first 32 bytes
+    // BouncyCastle's Ed25519PrivateKeyParameters expects the seed, not a pre-processed key
+    val privateKeyParams = org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters(this, 0)
+    val publicKeyParams = privateKeyParams.generatePublicKey()
+
+    // Return (seed, publicKey) - when concatenated this forms the 64-byte "secret key"
+    // that matches TweetNacl's behavior: secretKey = seed (32 bytes) + publicKey (32 bytes)
+    return Pair(this, publicKeyParams.encoded)
+}
+
+/**
  * Sign a message using Ed25519 for Solana network
  * @param privateKey 32-byte Ed25519 private key
  * @return Ed25519 signature (64 bytes)

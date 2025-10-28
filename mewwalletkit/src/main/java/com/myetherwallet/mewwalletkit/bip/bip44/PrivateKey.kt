@@ -26,7 +26,8 @@ class PrivateKey private constructor(
 
     companion object {
         fun createWithSeed(seed: ByteArray, network: Network): PrivateKey {
-            val output = HMAC.authenticate(HMAC_KEY_DATA, HMAC.Algorithm.HmacSHA512, seed)
+            val hmacKey = network.seedKey()
+            val output = HMAC.authenticate(hmacKey, HMAC.Algorithm.HmacSHA512, seed)
             if (output.count() != 64) {
                 throw InvalidDataException()
             }
@@ -73,7 +74,7 @@ class PrivateKey private constructor(
         }
 
         derivingIndex = node.index
-        data += derivingIndex.toByteArray()
+        data += derivingIndex.toByteArray(ByteOrder.BIG_ENDIAN)
 
         val digest: ByteArray
         try {
@@ -82,15 +83,24 @@ class PrivateKey private constructor(
             return null
         }
 
-        val factor = BigInteger(1, digest.copyOfRange(0, 32))
-        val curveOrder = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141".hexToBigInteger()
+        when (network) {
+            Network.SOLANA, Network.SOLANA_ANONYMIZED_ID -> {
+                // Ed25519 derivation (SLIP-0010) - no curve math, just use digest directly
+                derivedPrivateKeyData = digest.copyOfRange(0, 32).padLeft(32)
+                derivedChainCode = digest.copyOfRange(32, 64)
+            }
+            else -> {
+                // secp256k1 derivation with curve order math
+                val factor = BigInteger(1, digest.copyOfRange(0, 32))
+                val curveOrder = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141".hexToBigInteger()
 
-        val rawKey = BigInteger(1, rawPrivateKey)
-        val calculatedKey = ((factor + rawKey) % curveOrder)
+                val rawKey = BigInteger(1, rawPrivateKey)
+                val calculatedKey = ((factor + rawKey) % curveOrder)
 
-        derivedPrivateKeyData = calculatedKey.toByteArrayWithoutLeadingZeroByte().padLeft(32)
-
-        derivedChainCode = digest.copyOfRange(32, 64)
+                derivedPrivateKeyData = calculatedKey.toByteArrayWithoutLeadingZeroByte().padLeft(32)
+                derivedChainCode = digest.copyOfRange(32, 64)
+            }
+        }
 
         val fingerprint = publicKeyData.ripemd160().prefix(4)
         val derivedPrivateKey = PrivateKey(
@@ -108,10 +118,25 @@ class PrivateKey private constructor(
     private fun derive(node: DerivationNode): PrivateKey? = null
 
     fun publicKey(compressed: Boolean? = null): PublicKey? {
-        try {
-            return PublicKey(rawPrivateKey, compressed ?: network.publicKeyCompressed(), chainCode, depth, fingerprint, index, network)
-        } catch (e: Exception) {
-            return null
+        return when (network) {
+            Network.SOLANA, Network.SOLANA_ANONYMIZED_ID -> {
+                try {
+                    // Generate Ed25519 public key from private key
+                    val (_, publicKey) = rawPrivateKey.generateEd25519KeyPair()
+                    // Use Ed25519-specific constructor
+                    PublicKey(publicKey, network)
+                } catch (e: Exception) {
+                    null
+                }
+            }
+            else -> {
+                try {
+                    // Use secp256k1 for other networks
+                    PublicKey(rawPrivateKey, compressed ?: network.publicKeyCompressed(), chainCode, depth, fingerprint, index, network)
+                } catch (e: Exception) {
+                    null
+                }
+            }
         }
     }
 
@@ -149,29 +174,16 @@ class PrivateKey private constructor(
     override fun address() = publicKey()?.address()
 
     /**
-     * Sign a transaction using the appropriate algorithm for the network
+     * Returns 64-byte Ed25519 secret key (32-byte private + 32-byte public)
+     * Only for Solana network
      */
-    fun signTransaction(transaction: Transaction): Transaction {
+    fun ed25519(): ByteArray? {
         return when (network) {
-            Network.SOLANA -> {
-                // For Solana, we need Ed25519 signing
-                val messageHash = transaction.hash() ?: throw IllegalStateException("Cannot generate transaction hash")
-                val signature = messageHash.signSolanaMessage(rawPrivateKey)
-                // Note: This is a simplified implementation
-                // Real implementation would need to handle Solana transaction signing properly
-                transaction
+            Network.SOLANA, Network.SOLANA_ANONYMIZED_ID -> {
+                val (privateKey, publicKey) = rawPrivateKey.generateEd25519KeyPair()
+                privateKey + publicKey // 64 bytes total
             }
-            else -> {
-                // Use existing secp256k1 signing for Ethereum and Bitcoin networks
-                val messageHash = transaction.hash() ?: throw IllegalStateException("Cannot generate transaction hash")
-                val signature = rawPrivateKey.secp256k1RecoverableSign(messageHash)
-                    ?: throw IllegalStateException("Failed to sign transaction")
-
-                // Convert signature and apply to transaction
-                // Note: This is simplified - real implementation would handle different transaction types
-                transaction
-            }
+            else -> null
         }
     }
-
 }

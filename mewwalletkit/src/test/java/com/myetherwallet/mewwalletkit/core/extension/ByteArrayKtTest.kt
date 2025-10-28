@@ -225,14 +225,16 @@ class ByteArrayKtTest {
 
     @Test
     fun `eip55 tests`() {
-        // Test standard Ethereum address
+        // Test standard Ethereum address (20 bytes = 40 hex chars)
         val addressBytes = "5aaeb6053f3e94c9b9a09f33669435e7ef1beaed".hexToByteArray()
         val eip55Result = addressBytes.eip55()
-        Assert.assertTrue("EIP55 result should be valid hex string", eip55Result.matches(Regex("0x[0-9a-fA-F]{40}")))
+        Assert.assertNotNull("EIP55 result should not be null", eip55Result)
+        Assert.assertEquals("EIP55 result should be 40 chars", 40, eip55Result?.length)
+        Assert.assertTrue("EIP55 result should be valid hex string", eip55Result?.matches(Regex("[0-9a-fA-F]{40}")) == true)
 
-        // Test empty array
+        // Test empty array (returns empty string, like String.eip55() does)
         val emptyResult = byteArrayOf().eip55()
-        Assert.assertEquals("0x", emptyResult)
+        Assert.assertEquals("Empty array should return empty string", "", emptyResult)
     }
 
     @Test
@@ -359,8 +361,8 @@ class ByteArrayKtTest {
         Assert.assertNull("Out of bounds should return null", data.toBits(24, 1))
         Assert.assertNull("Invalid range should return null", data.toBits(10, 15))
 
-        // Test zero length
-        Assert.assertEquals("Zero length should return 0", 0, data.toBits(0, 0))
+        // Test zero length (empty range returns null in original implementation)
+        Assert.assertNull("Zero length should return null", data.toBits(0, 0))
 
         // Test single bit
         Assert.assertEquals("First bit should be 1", 1, data.toBits(0, 1))
