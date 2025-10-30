@@ -76,7 +76,7 @@ sealed class Network(val title: String, val path: String, val chainId: BigIntege
 
     fun alphabet() =
         when (this) {
-            BITCOIN, LITECOIN, SOLANA, SOLANA_ANONYMIZED_ID -> "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+            BITCOIN, SOLANA -> "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
             else -> null
         }
 
@@ -103,7 +103,7 @@ sealed class Network(val title: String, val path: String, val chainId: BigIntege
 
     fun seedKey() =
         when (this) {
-            SOLANA, SOLANA_ANONYMIZED_ID -> "ed25519 seed".toByteArray()
+            SOLANA -> byteArrayOf(0x65, 0x64, 0x32, 0x35, 0x35, 0x31, 0x39, 0x20, 0x73, 0x65, 0x65, 0x64)
             else -> byteArrayOf(0x42, 0x69, 0x74, 0x63, 0x6F, 0x69, 0x6E, 0x20, 0x73, 0x65, 0x65, 0x64)
         }
 

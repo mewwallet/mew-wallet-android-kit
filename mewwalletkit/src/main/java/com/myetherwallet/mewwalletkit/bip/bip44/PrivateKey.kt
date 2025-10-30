@@ -84,7 +84,7 @@ class PrivateKey private constructor(
         }
 
         when (network) {
-            Network.SOLANA, Network.SOLANA_ANONYMIZED_ID -> {
+            Network.SOLANA -> {
                 // Ed25519 derivation (SLIP-0010) - no curve math, just use digest directly
                 derivedPrivateKeyData = digest.copyOfRange(0, 32).padLeft(32)
                 derivedChainCode = digest.copyOfRange(32, 64)
@@ -118,25 +118,10 @@ class PrivateKey private constructor(
     private fun derive(node: DerivationNode): PrivateKey? = null
 
     fun publicKey(compressed: Boolean? = null): PublicKey? {
-        return when (network) {
-            Network.SOLANA, Network.SOLANA_ANONYMIZED_ID -> {
-                try {
-                    // Generate Ed25519 public key from private key
-                    val (_, publicKey) = rawPrivateKey.generateEd25519KeyPair()
-                    // Use Ed25519-specific constructor
-                    PublicKey(publicKey, network)
-                } catch (e: Exception) {
-                    null
-                }
-            }
-            else -> {
-                try {
-                    // Use secp256k1 for other networks
-                    PublicKey(rawPrivateKey, compressed ?: network.publicKeyCompressed(), chainCode, depth, fingerprint, index, network)
-                } catch (e: Exception) {
-                    null
-                }
-            }
+        return try {
+            PublicKey(rawPrivateKey, compressed ?: network.publicKeyCompressed(), chainCode, depth, fingerprint, index, network)
+        } catch (e: Exception) {
+            null
         }
     }
 
@@ -179,7 +164,7 @@ class PrivateKey private constructor(
      */
     fun ed25519(): ByteArray? {
         return when (network) {
-            Network.SOLANA, Network.SOLANA_ANONYMIZED_ID -> {
+            Network.SOLANA -> {
                 val (privateKey, publicKey) = rawPrivateKey.generateEd25519KeyPair()
                 privateKey + publicKey // 64 bytes total
             }

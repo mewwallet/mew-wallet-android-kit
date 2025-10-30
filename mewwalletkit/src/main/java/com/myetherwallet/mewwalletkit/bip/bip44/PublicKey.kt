@@ -30,11 +30,19 @@ class PublicKey : Key {
         index: Int,
         network: Network
     ) {
-        val publicKey = Secp256k1.pubkeyCreate(privateKey)
-        raw = if (compressed) {
-            Secp256k1.pubKeyCompress(publicKey)
-        } else {
-            publicKey
+        raw = when (network) {
+            Network.SOLANA -> {
+                val (_, publicKey) = privateKey.generateEd25519KeyPair()
+                publicKey
+            }
+            else -> {
+                val publicKey = Secp256k1.pubkeyCreate(privateKey)
+                if (compressed) {
+                    Secp256k1.pubKeyCompress(publicKey)
+                } else {
+                    publicKey
+                }
+            }
         }
         this.chainCode = chainCode
         this.depth = depth
