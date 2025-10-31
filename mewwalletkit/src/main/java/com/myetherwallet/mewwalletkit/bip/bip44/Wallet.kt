@@ -31,6 +31,12 @@ class Wallet {
         return Wallet(derivedPrivateKey)
     }
 
+    fun derive(index: Int): Wallet {
+        val derivationPath = privateKey.network.pathWithIndex(index).derivationPath()
+        val derivedPrivateKey = this.privateKey.derived(derivationPath) ?: throw EmptyPrivateKeyException()
+        return Wallet(derivedPrivateKey)
+    }
+
     companion object {
 
         fun generate(bitsOfEntropy: Int = 256, language: BaseWordlist = EnglishWordlist(), network: Network = Network.ETHEREUM): Pair<BIP39, Wallet> {

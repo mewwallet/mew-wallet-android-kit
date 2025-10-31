@@ -25,26 +25,14 @@ class SolanaKeyDerivationTest {
         val bip39 = BIP39(mnemonicWords)
         val seed = bip39.seed()
         assertNotNull("Seed should not be null", seed)
+        val wallet = Wallet(seed!!, Network.SOLANA)
+        val derivedWallet = wallet.derive(0)
 
-        // Create master key with Solana network
-        val masterKey = PrivateKey.createWithSeed(seed!!, Network.SOLANA)
-        assertNotNull(masterKey)
-
-        // Derive path m/44'/501'/0'/0' (Solana standard path)
-        // For hardened derivation, must add 0x80000000 to the index
-        val hardenedOffset = 0x80000000.toInt()
-        val nodes: Array<DerivationNode> = arrayOf(
-            DerivationNode.HARDENED(hardenedOffset or 44),   // 44'
-            DerivationNode.HARDENED(hardenedOffset or 501),  // 501' (Solana coin type)
-            DerivationNode.HARDENED(hardenedOffset or 0),    // 0' (account)
-            DerivationNode.HARDENED(hardenedOffset or 0)     // 0' (change)
-        )
-
-        val derivedKey = masterKey.derived(nodes)
+        val derivedKey = derivedWallet.privateKey
         assertNotNull("Derived key should not be null", derivedKey)
 
         // Test 1: privateKey.data() should return 32-byte private key
-        val privateKeyData = derivedKey!!.data()
+        val privateKeyData = derivedKey.data()
         assertEquals("Private key should be 32 bytes", 32, privateKeyData.size)
         assertEquals(
             "Private key hex should match iOS",

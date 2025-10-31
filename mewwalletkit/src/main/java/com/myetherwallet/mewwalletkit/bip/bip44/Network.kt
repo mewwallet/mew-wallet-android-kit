@@ -107,6 +107,11 @@ sealed class Network(val title: String, val path: String, val chainId: BigIntege
             else -> byteArrayOf(0x42, 0x69, 0x74, 0x63, 0x6F, 0x69, 0x6E, 0x20, 0x73, 0x65, 0x65, 0x64)
         }
 
+    fun pathWithIndex(index: Int) = when (this) {
+        SOLANA -> "m/44'/501'/$index'/0'"
+        else -> "$path/$index"
+    }
+
     companion object {
         fun findByChaidId(chainId: BigInteger?): Network? {
             for (sealedSubclass in Network::class.sealedSubclasses) {
