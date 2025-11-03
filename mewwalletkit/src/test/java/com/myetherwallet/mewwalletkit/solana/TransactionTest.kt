@@ -16,24 +16,20 @@ class TransactionTest {
         assertEquals("New transaction should have no signatures", 0, transaction.getSignatures().size)
         assertNull("New transaction should have no fee payer set", transaction.feePayer)
         assertNull("New transaction should have no blockhash set", transaction.recentBlockhash)
-        assertNull("New transaction should have no block height set", transaction.lastValidBlockHeight)
     }
 
     @Test
     fun `test create transaction with fee payer and blockhash`() {
         val feePayer = TestHelpers.createTestPublicKeys(1)[0]
         val blockhash = "4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ"
-        val blockHeight = 123456UL
 
         val transaction = Transaction(
             feePayer = feePayer,
-            recentBlockhash = blockhash,
-            lastValidBlockHeight = blockHeight
+            recentBlockhash = blockhash
         )
 
         assertEquals("Fee payer should be set", feePayer, transaction.feePayer)
         assertEquals("Blockhash should be set", blockhash, transaction.recentBlockhash)
-        assertEquals("Block height should be set", blockHeight, transaction.lastValidBlockHeight)
     }
 
     @Test

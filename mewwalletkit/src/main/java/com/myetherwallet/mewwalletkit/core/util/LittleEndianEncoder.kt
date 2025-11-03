@@ -72,13 +72,3 @@ fun Long.toLittleEndianBytes(): ByteArray {
     buffer.putLong(this)
     return buffer.array()
 }
-
-/**
- * Encodes a String as Rust-style bytes (length-prefixed UTF-8).
- * Format: [u32 length in LE] + [UTF-8 bytes]
- */
-fun String.toRustBytes(): ByteArray {
-    val utf8Bytes = this.toByteArray(Charsets.UTF_8)
-    val length = utf8Bytes.size.toUInt()
-    return length.toLittleEndianBytes() + utf8Bytes
-}

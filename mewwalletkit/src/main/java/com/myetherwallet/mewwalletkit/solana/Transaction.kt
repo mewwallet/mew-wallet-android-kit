@@ -21,12 +21,10 @@ import org.bouncycastle.crypto.signers.Ed25519Signer
  *
  * @property feePayer The account that will pay transaction fees (defaults to first signer if not set)
  * @property recentBlockhash Recent blockhash for transaction expiry (required before signing)
- * @property lastValidBlockHeight Optional block height after which transaction is invalid
  */
 class Transaction(
     var feePayer: PublicKey? = null,
-    var recentBlockhash: String? = null,
-    val lastValidBlockHeight: ULong? = null
+    var recentBlockhash: String? = null
 ) {
     private val signatures: MutableList<SignaturePubkeyPair> = mutableListOf()
     private val instructions: MutableList<TransactionInstruction> = mutableListOf()
