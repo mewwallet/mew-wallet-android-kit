@@ -50,6 +50,48 @@ class PrivateKey private constructor(
                 0,
                 network
             )
+
+        /**
+         * Creates a PrivateKey from a hex-encoded string.
+         *
+         * @param hex Hex-encoded private key (with or without 0x prefix)
+         * @param network The blockchain network
+         * @return PrivateKey instance
+         * @throws InvalidDataException if hex string is invalid or not 32 bytes
+         */
+        fun createWithHex(hex: String, network: Network): PrivateKey {
+            val decodedBytes = try {
+                hex.hexToByteArray()
+            } catch (_: Exception) {
+                throw InvalidDataException()
+            }
+            val privateKeyBytes = if (decodedBytes.size == 32) decodedBytes else throw InvalidDataException()
+            return createWithPrivateKey(privateKeyBytes, network)
+        }
+
+        /**
+         * Creates a PrivateKey from a Base58-encoded string.
+         *
+         * @param base58 Base58-encoded private key
+         * @param network The blockchain network
+         * @return PrivateKey instance
+         * @throws InvalidDataException if Base58 string is invalid or network doesn't support Base58
+         */
+        fun createWithBase58(base58: String, network: Network): PrivateKey {
+            val alphabet = network.alphabet()
+                ?: throw InvalidDataException()
+
+            val decodedBytes = base58.decodeBase58(alphabet)
+                ?: throw InvalidDataException()
+
+            val privateKeyBytes = when (decodedBytes.size) {
+                64 -> decodedBytes.prefix(32)
+                32 -> decodedBytes
+                else -> throw InvalidDataException()
+            }
+
+            return createWithPrivateKey(privateKeyBytes, network)
+        }
     }
 
     fun derived(nodes: Array<DerivationNode>): PrivateKey? {
