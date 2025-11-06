@@ -254,9 +254,10 @@ class SerializationTest {
         try {
             transaction.serialize() // Should fail - no signatures
             fail("Should throw exception when signatures are missing")
-        } catch (e: IllegalStateException) {
-            assertTrue("Should mention missing signatures",
-                e.message?.contains("Missing signatures") == true)
+        } catch (e: ValidationException) {
+            assertEquals("Should have 1 error", 1, e.errors.size)
+            assertTrue("Error should be MissingSignature",
+                e.errors[0] is ValidationError.MissingSignature)
         }
     }
 

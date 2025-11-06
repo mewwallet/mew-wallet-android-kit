@@ -158,6 +158,15 @@ class Transaction(
     }
 
     /**
+     * Signs the transaction with the provided signers (vararg version).
+     *
+     * @param signers Variable number of private keys to sign with
+     */
+    fun sign(vararg signers: PrivateKey) {
+        sign(signers.toList())
+    }
+
+    /**
      * Partially signs the transaction with the provided signers.
      *
      * Does not replace existing signatures, only adds/updates signatures for
@@ -179,6 +188,63 @@ class Transaction(
 
         // Sign with provided signers (preserves existing signatures)
         partialSignInternal(message, uniqueSigners)
+    }
+
+    /**
+     * Partially signs the transaction with the provided signers (vararg version).
+     *
+     * @param signers Variable number of private keys to sign with
+     */
+    fun partialSign(vararg signers: PrivateKey) {
+        partialSign(signers.toList())
+    }
+
+    /**
+     * Sets the required signers for the transaction without signing.
+     *
+     * This method initializes empty signature slots for the specified public keys,
+     * allowing signatures to be added later via partialSign() or addSignature().
+     * Useful for multi-signature workflows where signatures are collected separately.
+     *
+     * This method directly sets the signature slots without compiling the message,
+     * allowing signers to be specified even if they're not yet part of any instruction.
+     *
+     * Note: This method clears any existing signatures and sets the feePayer to the first signer.
+     *
+     * @param signers List of public keys that will sign this transaction
+     * @throws IllegalArgumentException if signers list is empty
+     */
+    fun setSigners(signers: List<PublicKey>) {
+        require(signers.isNotEmpty()) { "At least one signer is required" }
+
+        // Set feePayer to first signer if not already set
+        if (feePayer == null) {
+            feePayer = signers.first()
+        }
+
+        // Deduplicate signers by public key
+        val uniqueSigners = signers.distinctBy { it }
+
+        // Clear and set signature slots directly
+        signatures.clear()
+        uniqueSigners.forEach { publicKey ->
+            signatures.add(SignaturePubkeyPair(
+                signature = null,
+                publicKey = publicKey
+            ))
+        }
+
+        // Invalidate cached message since we changed signature structure
+        cachedMessage = null
+    }
+
+    /**
+     * Sets the required signers for the transaction without signing (vararg version).
+     *
+     * @param signers Variable number of public keys that will sign this transaction
+     */
+    fun setSigners(vararg signers: PublicKey) {
+        setSigners(signers.toList())
     }
 
     /**
@@ -208,30 +274,70 @@ class Transaction(
      * - Message (header + accounts + blockhash + instructions)
      *
      * @param requireAllSignatures Whether to fail if any signature is missing
-     * @param verifySignatures Whether to verify Ed25519 signatures (Phase 5)
+     * @param verifySignatures Whether to verify Ed25519 signatures
      * @return Serialized transaction bytes ready for broadcast
-     * @throws IllegalStateException if requireAllSignatures is true and any signature is missing
+     * @throws ValidationException if signature validation fails (missing or invalid signatures)
      */
     fun serialize(requireAllSignatures: Boolean = true, verifySignatures: Boolean = true): ByteArray {
         // Compile message if not already done
         val message = compileMessage()
 
+        // Collect all validation errors
+        val errors = mutableListOf<ValidationError>()
+
         // Check for missing signatures if required
         if (requireAllSignatures) {
-            val missingSignatures = signatures.filter { it.signature == null }
-            if (missingSignatures.isNotEmpty()) {
-                throw IllegalStateException(
-                    "Missing signatures for ${missingSignatures.size} accounts. " +
-                    "Call sign() or partialSign() before serializing."
-                )
+            signatures.forEach { sigPair ->
+                if (sigPair.signature == null) {
+                    errors.add(ValidationError.MissingSignature(sigPair.publicKey))
+                }
             }
         }
 
         // Verify signatures if requested
         if (verifySignatures) {
-            if (!verifySignatures(requireAllSignatures)) {
-                throw IllegalStateException("Signature verification failed. One or more signatures are invalid.")
+            val messageBytes = com.myetherwallet.mewwalletkit.solana.serialization.MessageSerializer.serializeMessage(message)
+
+            signatures.forEach { sigPair ->
+                val signature = sigPair.signature
+
+                // Skip null signatures if not required
+                if (signature == null) {
+                    if (requireAllSignatures) {
+                        // Already added as missing signature above
+                    }
+                    return@forEach
+                }
+
+                // Validate signature is 64 bytes
+                if (signature.size != 64) {
+                    errors.add(ValidationError.InvalidSignature(sigPair.publicKey))
+                    return@forEach
+                }
+
+                // Create Ed25519 public key parameters
+                val publicKeyBytes = sigPair.publicKey.data()
+                if (publicKeyBytes.size != 32) {
+                    errors.add(ValidationError.InvalidSignature(sigPair.publicKey))
+                    return@forEach
+                }
+
+                val publicKeyParams = Ed25519PublicKeyParameters(publicKeyBytes, 0)
+
+                // Create verifier and verify signature
+                val verifier = Ed25519Signer()
+                verifier.init(false, publicKeyParams)  // false = verify mode
+                verifier.update(messageBytes, 0, messageBytes.size)
+
+                if (!verifier.verifySignature(signature)) {
+                    errors.add(ValidationError.InvalidSignature(sigPair.publicKey))
+                }
             }
+        }
+
+        // Throw ValidationException if any errors were found
+        if (errors.isNotEmpty()) {
+            throw ValidationException(errors)
         }
 
         return com.myetherwallet.mewwalletkit.solana.serialization.MessageSerializer.serializeTransaction(

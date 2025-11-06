@@ -13,7 +13,7 @@ import org.junit.Test
  *
  * WARNING: Test keys are publicly known - NEVER use in production!
  */
-class RealTransactionTest {
+class TransactionIntegrationTest {
 
     /**
      * Test creating and signing a real SOL transfer transaction.
@@ -368,7 +368,7 @@ class RealTransactionTest {
             try {
                 transaction.serialize(requireAllSignatures = true, verifySignatures = false)
                 true
-            } catch (e: IllegalStateException) {
+            } catch (e: ValidationException) {
                 false
             }
         )

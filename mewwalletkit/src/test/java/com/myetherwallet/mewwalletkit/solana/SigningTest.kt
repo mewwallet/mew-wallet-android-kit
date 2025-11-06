@@ -442,8 +442,10 @@ class SigningTest {
         try {
             transaction.serialize(requireAllSignatures = true, verifySignatures = true)
             fail("Serialize should fail with invalid signature when verification enabled")
-        } catch (e: IllegalStateException) {
-            assertTrue("Should mention verification failure", e.message?.contains("verification failed") == true)
+        } catch (e: ValidationException) {
+            assertEquals("Should have 1 error", 1, e.errors.size)
+            assertTrue("Error should be InvalidSignature",
+                e.errors[0] is ValidationError.InvalidSignature)
         }
     }
 
