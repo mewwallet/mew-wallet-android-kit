@@ -157,4 +157,34 @@ class PublicKey : Key {
         return result
     }
 
+    companion object {
+        /**
+         * Creates a PublicKey from a Base58-encoded string.
+         *
+         * @param base58 Base58-encoded public key
+         * @param network The blockchain network
+         * @return PublicKey instance
+         * @throws IllegalArgumentException if Base58 string is invalid or network doesn't support Base58
+         */
+        fun createWithBase58(base58: String, network: Network): PublicKey {
+            val alphabet = network.alphabet()
+                ?: throw IllegalArgumentException("Network $network doesn't support Base58")
+
+            val decodedBytes = base58.decodeBase58(alphabet)
+                ?: throw IllegalArgumentException("Invalid Base58 string")
+
+            return when (network) {
+                Network.SOLANA -> {
+                    require(decodedBytes.size == SOLANA_PUBLIC_KEY_SIZE) {
+                        "Solana public key must be 32 bytes, got ${decodedBytes.size}"
+                    }
+                    PublicKey(decodedBytes, network)
+                }
+                else -> {
+                    PublicKey(decodedBytes, false, network)
+                }
+            }
+        }
+    }
+
 }

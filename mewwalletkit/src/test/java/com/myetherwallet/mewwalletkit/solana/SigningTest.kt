@@ -4,7 +4,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /**
- * Tests for Solana transaction signing and verification (Phase 5)
+ * Solana transaction signing and verification tests.
  */
 class SigningTest {
 

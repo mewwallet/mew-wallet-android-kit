@@ -8,10 +8,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /**
- * Tests for Solana transaction signing functionality.
- *
- * Based on iOS tests from:
- * https://github.com/mewwallet/mew-wallet-ios-kit/blob/19e6209db869b934538d24f0af952e832e245993/Tests/mew-wallet-ios-kit-solana-sign/Solana.Transaction.Sign%2BTests.swift
+ * Solana transaction signing tests (matches iOS implementation).
  */
 class TransactionSignTest {
 
