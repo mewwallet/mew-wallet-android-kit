@@ -24,4 +24,41 @@ data class Message(
     val accountKeys: List<PublicKey>,
     val recentBlockhash: String,
     val instructions: List<CompiledInstruction>
-)
+) {
+    /**
+     * Returns true if the account at the given index is writable in this message.
+     *
+     * Writability is derived from header counts assuming canonical ordering:
+     * - Signers: first numRequiredSignatures, with the last
+     *   numReadonlySignedAccounts being read-only.
+     * - Non-signers: the remainder, with the last
+     *   numReadonlyUnsignedAccounts being read-only.
+     *
+     * @param index The account index to check
+     * @return true if the account is writable, false otherwise
+     */
+    fun isAccountWritable(index: Int): Boolean {
+        val numSignedAccounts = header.numRequiredSignatures.toInt()
+        return if (index >= numSignedAccounts) {
+            // Non-signer account
+            val unsignedAccountIndex = index - numSignedAccounts
+            val numUnsignedAccounts = accountKeys.size - numSignedAccounts
+            val numWritableUnsignedAccounts = numUnsignedAccounts - header.numReadonlyUnsignedAccounts.toInt()
+            unsignedAccountIndex < numWritableUnsignedAccounts
+        } else {
+            // Signer account
+            val numWritableSignedAccounts = numSignedAccounts - header.numReadonlySignedAccounts.toInt()
+            index < numWritableSignedAccounts
+        }
+    }
+
+    /**
+     * Returns true if the account at the given index is a signer in this message.
+     *
+     * @param index The account index to check
+     * @return true if the account is a signer, false otherwise
+     */
+    fun isAccountSigner(index: Int): Boolean {
+        return index < header.numRequiredSignatures.toInt()
+    }
+}

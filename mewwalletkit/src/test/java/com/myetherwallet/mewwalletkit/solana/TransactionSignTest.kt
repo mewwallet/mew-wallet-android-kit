@@ -51,7 +51,17 @@ class TransactionSignTest {
         val serializedTransactionBase64 = "AVuErQHaXv0SG0/PchunfxHKt8wMRfMZzqV0tkC5qO6owYxWU2v871AoWywGoFQr4z+q/7mE8lIufNl/kxj+nQ0BAAEDE5j2LG0aRXxRumpLXz29L2n8qTIWIY3ImX5Ba9F9k8r9Q5/Mtmcn8onFxt47xKj+XdXXd3C8j/FcPu7csUrz/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAxJrndgN4IFTxep3s6kO0ROug7bEsbx0xxuDkqEvwUusBAgIAAQwCAAAAMQAAAAAAAAA="
         val serializedTransaction = Base64.getDecoder().decode(serializedTransactionBase64)
 
+        // Verify expected transaction serializes correctly
         assertArrayEquals(serializedTransaction, expectedSerializedTransaction)
+
+        // Deserialize the transaction
+        val deserializedTransaction = Transaction.deserialize(serializedTransaction)
+
+        // Serialize the deserialized transaction
+        val deserializedSerializedTransaction = deserializedTransaction.serialize()
+
+        // Verify deserialized transaction serializes back to the same bytes
+        assertArrayEquals(serializedTransaction, deserializedSerializedTransaction)
     }
 
     @Test

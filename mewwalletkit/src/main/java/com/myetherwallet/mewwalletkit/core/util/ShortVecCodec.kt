@@ -118,4 +118,25 @@ object ShortVecCodec {
         val itemsBytes = items.flatMap { itemEncoder(it).toList() }.toByteArray()
         return lengthBytes + itemsBytes
     }
+
+    /**
+     * Decodes a compact-encoded list from bytes.
+     *
+     * @param bytes The bytes to decode from
+     * @param offset The offset to start reading from (will be updated)
+     * @param itemDecoder Function to decode each item, returns (item, bytes consumed)
+     * @return Decoded list of items
+     */
+    fun <T> decodeList(bytes: ByteArray, offset: IntArray, itemDecoder: (ByteArray, Int) -> Pair<T, Int>): List<T> {
+        val (length, lengthBytes) = decodeLength(bytes, offset[0])
+        offset[0] += lengthBytes
+
+        val items = mutableListOf<T>()
+        repeat(length) {
+            val (item, itemBytes) = itemDecoder(bytes, offset[0])
+            items.add(item)
+            offset[0] += itemBytes
+        }
+        return items
+    }
 }

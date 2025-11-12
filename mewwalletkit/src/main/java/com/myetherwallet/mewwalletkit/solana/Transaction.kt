@@ -59,6 +59,69 @@ class Transaction(
     fun getSignatures(): List<SignaturePubkeyPair> = signatures.toList()
 
     /**
+     * Populates this transaction from deserialized signatures and message.
+     *
+     * This method is used for reconstructing a transaction from wire format.
+     * It extracts transaction instructions from the compiled message and sets up
+     * the signature slots for all required signers.
+     *
+     * @param rawSignatures List of 64-byte signature arrays (may be all zeros for unsigned)
+     * @param message The compiled message containing all transaction data
+     */
+    fun populate(rawSignatures: List<ByteArray>, message: Message) {
+        // Clear existing state
+        signatures.clear()
+        instructions.clear()
+        extraSigners.clear()
+        cachedMessage = null
+
+        // Set basic properties from message
+        this.recentBlockhash = message.recentBlockhash
+        this.feePayer = message.accountKeys.firstOrNull()
+
+        // Set cached message
+        this.cachedMessage = message
+
+        // Reconstruct signature pairs
+        val numSigners = message.header.numRequiredSignatures.toInt()
+        for (i in 0 until numSigners) {
+            val publicKey = message.accountKeys[i]
+            val signature = if (i < rawSignatures.size) {
+                // Check if signature is all zeros (unsigned)
+                if (rawSignatures[i].all { it == 0.toByte() }) {
+                    null
+                } else {
+                    rawSignatures[i]
+                }
+            } else {
+                null
+            }
+
+            signatures.add(SignaturePubkeyPair(signature, publicKey))
+        }
+
+        // Reconstruct instructions from compiled instructions
+        message.instructions.forEach { compiledInstruction ->
+            val programId = message.accountKeys[compiledInstruction.programIdIndex.toInt()]
+            val keys = compiledInstruction.accounts.map { accountIndex ->
+                val accountIndexInt = accountIndex.toInt()
+                val publicKey = message.accountKeys[accountIndexInt]
+                val isSigner = message.isAccountSigner(accountIndexInt)
+                val isWritable = message.isAccountWritable(accountIndexInt)
+                AccountMeta(publicKey, isSigner, isWritable)
+            }
+
+            instructions.add(
+                TransactionInstruction(
+                    programId = programId,
+                    keys = keys,
+                    data = compiledInstruction.data
+                )
+            )
+        }
+    }
+
+    /**
      * Compiles the transaction into an immutable Message.
      *
      * This process:
@@ -496,5 +559,33 @@ class Transaction(
 
         // Update the signature
         signatures[index].signature = signature
+    }
+
+    companion object {
+        /**
+         * Deserializes a transaction from wire format bytes.
+         *
+         * This method parses the transaction bytes and reconstructs a Transaction object
+         * with all signatures, message data, and instructions.
+         *
+         * @param bytes The transaction bytes to deserialize
+         * @return Deserialized Transaction object
+         */
+        fun deserialize(bytes: ByteArray): Transaction {
+            val (rawSignatures, versionedMessage) = com.myetherwallet.mewwalletkit.solana.serialization.MessageSerializer.deserializeTransaction(bytes)
+
+            val transaction = Transaction()
+
+            when (versionedMessage) {
+                is VersionedMessage.Legacy -> {
+                    transaction.populate(rawSignatures, versionedMessage.message)
+                }
+                is VersionedMessage.V0 -> {
+                    throw IllegalArgumentException("V0 transaction deserialization not yet supported. Use Transaction.deserialize() only for Legacy transactions.")
+                }
+            }
+
+            return transaction
+        }
     }
 }
