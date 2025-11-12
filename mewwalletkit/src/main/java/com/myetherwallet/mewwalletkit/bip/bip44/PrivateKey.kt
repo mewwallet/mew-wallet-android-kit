@@ -51,12 +51,12 @@ class PrivateKey private constructor(
             )
 
         /**
-         * Creates a PrivateKey from a hex string.
+         * Creates a PrivateKey from a hex-encoded string.
          *
          * @param hex Hex-encoded private key (with or without 0x prefix)
          * @param network The blockchain network
          * @return PrivateKey instance
-         * @throws InvalidDataException if hex string is invalid
+         * @throws InvalidDataException if hex string is invalid or not 32 bytes
          */
         fun createWithHex(hex: String, network: Network): PrivateKey {
             val decodedBytes = try {
