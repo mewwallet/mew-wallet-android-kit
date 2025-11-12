@@ -28,6 +28,7 @@ class Transaction(
 ) {
     private val signatures: MutableList<SignaturePubkeyPair> = mutableListOf()
     private val instructions: MutableList<TransactionInstruction> = mutableListOf()
+    private val extraSigners: MutableList<PublicKey> = mutableListOf()
     private var cachedMessage: Message? = null
 
     /**
@@ -90,8 +91,15 @@ class Transaction(
         // Collect all accounts from instructions
         val allAccounts = CompiledKeys.collectAccounts(instructions)
 
+        // Add extra signers to account list
+        val accountsWithExtras = if (extraSigners.isNotEmpty()) {
+            allAccounts + extraSigners.map { AccountMeta(it, isSigner = true, isWritable = false) }
+        } else {
+            allAccounts
+        }
+
         // Deduplicate and merge flags
-        val deduplicated = CompiledKeys.deduplicateAndMerge(allAccounts)
+        val deduplicated = CompiledKeys.deduplicateAndMerge(accountsWithExtras)
 
         // Sort accounts and generate header
         val (sortedKeys, header) = CompiledKeys.sortAndCreateHeader(deduplicated, payer)
@@ -107,14 +115,25 @@ class Transaction(
             instructions = compiledInstructions
         )
 
-        // Populate signatures array if empty (null signatures for unsigned)
+        // Populate or reorder signatures array to match sorted keys
+        val numSigners = header.numRequiredSignatures.toInt()
         if (signatures.isEmpty()) {
             // Create null signature slots for all required signers
-            val numSigners = header.numRequiredSignatures.toInt()
             for (i in 0 until numSigners) {
                 signatures.add(SignaturePubkeyPair(
                     signature = null, // unsigned
                     publicKey = sortedKeys[i] // First N keys are signers
+                ))
+            }
+        } else {
+            // Reorder existing signatures to match sortedKeys order
+            val existingSignatures = signatures.associateBy { it.publicKey }
+            signatures.clear()
+            for (i in 0 until numSigners) {
+                val existingSig = existingSignatures[sortedKeys[i]]
+                signatures.add(SignaturePubkeyPair(
+                    signature = existingSig?.signature, // Preserve existing signature
+                    publicKey = sortedKeys[i]
                 ))
             }
         }
@@ -144,16 +163,26 @@ class Transaction(
     fun sign(signers: List<PrivateKey>) {
         require(signers.isNotEmpty()) { "At least one signer is required" }
 
-        // 1. Clear existing signatures and let compileMessage() populate slots
+        // 1. Clear existing signatures and extra signers
         signatures.clear()
+        extraSigners.clear()
 
-        // 2. Compile message (automatically populates signature slots for all required signers)
+        // 2. Store all signers as extra signers
+        val publicKeys = signers.mapNotNull { it.publicKey() }
+        extraSigners.addAll(publicKeys)
+
+        // 3. Set feePayer to first signer if not already set
+        if (feePayer == null && publicKeys.isNotEmpty()) {
+            feePayer = publicKeys.first()
+        }
+
+        // 4. Compile message (includes extraSigners in account list)
         val message = compileMessage()
 
-        // 3. Deduplicate signers by public key
+        // 5. Deduplicate signers by public key
         val uniqueSigners = signers.distinctBy { it.publicKey() }
 
-        // 4. Sign with each signer
+        // 6. Sign with each signer
         partialSignInternal(message, uniqueSigners)
     }
 
@@ -179,6 +208,13 @@ class Transaction(
      */
     fun partialSign(signers: List<PrivateKey>) {
         require(signers.isNotEmpty()) { "At least one signer is required" }
+
+        // Preserve existing signature slots by adding them to extraSigners before compilation
+        if (signatures.isNotEmpty()) {
+            val existingPublicKeys = signatures.map { it.publicKey }
+            extraSigners.clear()
+            extraSigners.addAll(existingPublicKeys)
+        }
 
         // Deduplicate signers by public key
         val uniqueSigners = signers.distinctBy { it.publicKey() }
