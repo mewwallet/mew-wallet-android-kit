@@ -1,8 +1,10 @@
 package com.myetherwallet.mewwalletkit.solana
 
+import android.os.Parcelable
 import com.myetherwallet.mewwalletkit.bip.bip44.PrivateKey
 import com.myetherwallet.mewwalletkit.bip.bip44.PublicKey
 import com.myetherwallet.mewwalletkit.core.extension.signSolanaMessage
+import kotlinx.parcelize.Parcelize
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
 import org.bouncycastle.crypto.signers.Ed25519Signer
 
@@ -22,10 +24,11 @@ import org.bouncycastle.crypto.signers.Ed25519Signer
  * @property feePayer The account that will pay transaction fees (defaults to first signer if not set)
  * @property recentBlockhash Recent blockhash for transaction expiry (required before signing)
  */
+@Parcelize
 class Transaction(
     var feePayer: PublicKey? = null,
     var recentBlockhash: String? = null
-) {
+): Parcelable {
     private val signatures: MutableList<SignaturePubkeyPair> = mutableListOf()
     private val instructions: MutableList<TransactionInstruction> = mutableListOf()
     private val extraSigners: MutableList<PublicKey> = mutableListOf()
@@ -527,10 +530,10 @@ class Transaction(
         // Sign with each signer
         signers.forEach { signer ->
             // Get the 32-byte Ed25519 private key seed
-            val privateKey = signer.data()
+            val privateKey = signer.ed25519()
 
             // Sign the message using BouncyCastle Ed25519
-            val signature = messageBytes.signSolanaMessage(privateKey)
+            val signature = messageBytes.signSolanaMessage(privateKey ?: throw IllegalArgumentException("Invalid signer private key"))
 
             // Add signature to the transaction
             val publicKey = signer.publicKey() ?: throw IllegalArgumentException("Invalid signer public key")
