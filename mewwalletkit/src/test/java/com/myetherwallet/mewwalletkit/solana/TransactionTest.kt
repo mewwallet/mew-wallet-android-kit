@@ -2,6 +2,7 @@ package com.myetherwallet.mewwalletkit.solana
 
 import org.junit.Assert.*
 import org.junit.Test
+import java.util.Base64
 
 /**
  * Tests for Solana Transaction data structures (Phase 1)
@@ -180,5 +181,66 @@ class TransactionTest {
         // Should return different list instances (defensive copies)
         assertNotSame("Should return different list instances", instructions1, instructions2)
         assertEquals("But contents should be equal", instructions1, instructions2)
+    }
+
+    @Test
+    fun `test deserialize V0 transaction`() {
+        // V0 transaction from iOS tests (contains Address Lookup Tables)
+        val serializedVersionedTxBase64 = "AdTIDASR42TgVuXKkd7mJKk373J3LPVp85eyKMVcrboo9KTY8/vm6N/Cv0NiHqk2I8iYw6VX5ZaBKG8z9l1XjwiAAQACA+6qNbqfjaIENwt9GzEK/ENiB/ijGwluzBUmQ9xlTAMcCaS0ctnyxTcXXlJr7u2qtnaMgIAO2/c7RBD0ipHWUcEDBkZv5SEXMv/srbpyw5vnvIzlu8X3EmssQ5s6QAAAAJbI7VNs6MzREUlnzRaJpBKP8QQoDn2dWQvD0KIgHFDiAwIACQAgoQcAAAAAAAIABQEAAAQAATYPBwAKBDIBAyQWIw0oCxIdCA4iJzQRKwUZHxceHCohMBUJJiwpMxAaGC0TLhQxGyAMBiU2NS8VDgAAAADuAgAAAAAAAAIAAAAAAAAAAdGCTQiq5yw3+3m1sPoRNj0GtUNNs0FIMocxzt3zuoSZHQABAwQFBwgLDA8RFBcYGhwdHh8iIyUnKiwtLi8yFwIGCQoNDhASExUWGRsgISQmKCkrMDEz"
+        val serializedVersionedTx = Base64.getDecoder().decode(serializedVersionedTxBase64)
+
+        // Deserialize using Transaction.deserialize()
+        val transaction = Transaction.deserialize(serializedVersionedTx)
+
+        // Verify it's recognized as V0
+        assertEquals("Should be V0 version", TransactionVersion.V0, transaction.version)
+
+        // NOTE: This V0 transaction uses Address Lookup Tables, so instructions cannot be
+        // reconstructed without ALT data. The instructions list will be empty.
+        // The transaction can still be re-serialized correctly using the cached versioned message.
+
+        // Verify re-serialization produces the same bytes
+        val reserialized = transaction.serialize(requireAllSignatures = false, verifySignatures = false)
+        assertArrayEquals("Re-serialized bytes should match original", serializedVersionedTx, reserialized)
+    }
+
+    @Test
+    fun `test deserialize Legacy transaction`() {
+        // Create a simple Legacy transaction
+        val senderBytes = ByteArray(32) { 0x08 }
+        val sender = com.myetherwallet.mewwalletkit.bip.bip44.PrivateKey.createWithPrivateKey(
+            senderBytes,
+            com.myetherwallet.mewwalletkit.bip.bip44.Network.SOLANA
+        )
+        val recentBlockhash = "EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k"
+        val recipient = com.myetherwallet.mewwalletkit.bip.bip44.PublicKey.createWithBase58(
+            "J3dxNj7nDRRqRRXuEMynDG57DkZK4jYRuv3Garmb1i99",
+            com.myetherwallet.mewwalletkit.bip.bip44.Network.SOLANA
+        )
+
+        val transfer = SystemProgram.transfer(
+            fromPubkey = sender.publicKey()!!,
+            toPubkey = recipient,
+            lamports = 49u
+        )
+
+        var expectedTransaction = Transaction(sender.publicKey(), recentBlockhash)
+        expectedTransaction.add(transfer)
+        expectedTransaction.sign(sender)
+
+        val serialized = expectedTransaction.serialize()
+
+        // Deserialize using Transaction.deserialize()
+        val deserialized = Transaction.deserialize(serialized)
+
+        // Verify it's recognized as Legacy
+        assertEquals("Should be Legacy version", TransactionVersion.LEGACY, deserialized.version)
+
+        // Verify blockhash matches
+        assertEquals("Blockhash should match", recentBlockhash, deserialized.recentBlockhash)
+
+        // Verify re-serialization produces the same bytes
+        val reserialized = deserialized.serialize()
+        assertArrayEquals("Re-serialized bytes should match original", serialized, reserialized)
     }
 }

@@ -4,6 +4,7 @@ import android.os.Parcelable
 import com.myetherwallet.mewwalletkit.bip.bip44.PrivateKey
 import com.myetherwallet.mewwalletkit.bip.bip44.PublicKey
 import com.myetherwallet.mewwalletkit.core.extension.signSolanaMessage
+import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
 import org.bouncycastle.crypto.signers.Ed25519Signer
@@ -33,6 +34,20 @@ class Transaction(
     private val instructions: MutableList<TransactionInstruction> = mutableListOf()
     private val extraSigners: MutableList<PublicKey> = mutableListOf()
     private var cachedMessage: Message? = null
+
+    /**
+     * Cached versioned message (for V0 transactions).
+     * When set, this takes precedence over cachedMessage.
+     */
+    @IgnoredOnParcel
+    private var cachedVersionedMessage: VersionedMessage? = null
+
+    /**
+     * Transaction version (LEGACY or V0).
+     * Returns LEGACY by default, or the version from cachedVersionedMessage if present.
+     */
+    val version: TransactionVersion
+        get() = cachedVersionedMessage?.version ?: TransactionVersion.LEGACY
 
     /**
      * Adds an instruction to this transaction.
@@ -121,6 +136,105 @@ class Transaction(
                     data = compiledInstruction.data
                 )
             )
+        }
+    }
+
+    /**
+     * Populates this transaction from deserialized signatures and versioned message.
+     *
+     * This method is used for reconstructing a transaction from V0 wire format.
+     * It extracts transaction instructions from the versioned message and sets up
+     * the signature slots for all required signers.
+     *
+     * For V0 transactions with Address Lookup Tables, instructions cannot be fully
+     * reconstructed without the ALT data. In this case, only signatures and basic
+     * properties are populated, and the versioned message is cached.
+     *
+     * @param rawSignatures List of 64-byte signature arrays (may be all zeros for unsigned)
+     * @param versionedMessage The versioned message containing all transaction data (Legacy or V0)
+     */
+    fun populate(rawSignatures: List<ByteArray>, versionedMessage: VersionedMessage) {
+        // Clear existing state
+        signatures.clear()
+        instructions.clear()
+        extraSigners.clear()
+        cachedMessage = null
+        cachedVersionedMessage = null
+
+        // Set basic properties from versioned message
+        this.recentBlockhash = versionedMessage.recentBlockhash
+        this.feePayer = versionedMessage.staticAccountKeys.firstOrNull()
+
+        // Cache the versioned message
+        this.cachedVersionedMessage = versionedMessage
+
+        // Reconstruct signature pairs
+        val numSigners = versionedMessage.header.numRequiredSignatures.toInt()
+        for (i in 0 until numSigners) {
+            val publicKey = versionedMessage.staticAccountKeys[i]
+            val signature = if (i < rawSignatures.size) {
+                // Check if signature is all zeros (unsigned)
+                if (rawSignatures[i].all { it == 0.toByte() }) {
+                    null
+                } else {
+                    rawSignatures[i]
+                }
+            } else {
+                null
+            }
+
+            signatures.add(SignaturePubkeyPair(signature, publicKey))
+        }
+
+        // For V0 transactions with ALTs, we cannot reconstruct instructions without ALT data
+        // Only reconstruct for Legacy or V0 without ALT lookups
+        when (versionedMessage) {
+            is VersionedMessage.Legacy -> {
+                // Reconstruct instructions from compiled instructions
+                versionedMessage.compiledInstructions.forEach { compiledInstruction ->
+                    val programId = versionedMessage.staticAccountKeys[compiledInstruction.programIdIndex.toInt()]
+                    val keys = compiledInstruction.accounts.map { accountIndex ->
+                        val accountIndexInt = accountIndex.toInt()
+                        val publicKey = versionedMessage.staticAccountKeys[accountIndexInt]
+                        val isSigner = versionedMessage.isAccountSigner(accountIndexInt)
+                        val isWritable = versionedMessage.isAccountWritable(accountIndexInt)
+                        AccountMeta(publicKey, isSigner, isWritable)
+                    }
+
+                    instructions.add(
+                        TransactionInstruction(
+                            programId = programId,
+                            keys = keys,
+                            data = compiledInstruction.data
+                        )
+                    )
+                }
+            }
+            is VersionedMessage.V0 -> {
+                // For V0, only reconstruct if no ALT lookups are present
+                if (versionedMessage.message.addressTableLookups.isEmpty()) {
+                    versionedMessage.compiledInstructions.forEach { compiledInstruction ->
+                        val programId = versionedMessage.staticAccountKeys[compiledInstruction.programIdIndex.toInt()]
+                        val keys = compiledInstruction.accounts.map { accountIndex ->
+                            val accountIndexInt = accountIndex.toInt()
+                            val publicKey = versionedMessage.staticAccountKeys[accountIndexInt]
+                            val isSigner = versionedMessage.isAccountSigner(accountIndexInt)
+                            val isWritable = versionedMessage.isAccountWritable(accountIndexInt)
+                            AccountMeta(publicKey, isSigner, isWritable)
+                        }
+
+                        instructions.add(
+                            TransactionInstruction(
+                                programId = programId,
+                                keys = keys,
+                                data = compiledInstruction.data
+                            )
+                        )
+                    }
+                }
+                // If ALT lookups are present, instructions remain empty
+                // The transaction can still be serialized using the cached versioned message
+            }
         }
     }
 
@@ -381,8 +495,16 @@ class Transaction(
      * @throws ValidationException if signature validation fails (missing or invalid signatures)
      */
     fun serialize(requireAllSignatures: Boolean = true, verifySignatures: Boolean = true): ByteArray {
-        // Compile message if not already done
-        val message = compileMessage()
+        // Check if this is a V0 transaction (from deserialization)
+        val versionedMessage = cachedVersionedMessage
+
+        // For V0, use cached versioned message; for Legacy, compile message
+        val messageBytes = if (versionedMessage != null) {
+            com.myetherwallet.mewwalletkit.solana.serialization.MessageSerializer.serializeVersionedMessage(versionedMessage)
+        } else {
+            val message = compileMessage()
+            com.myetherwallet.mewwalletkit.solana.serialization.MessageSerializer.serializeMessage(message)
+        }
 
         // Collect all validation errors
         val errors = mutableListOf<ValidationError>()
@@ -398,8 +520,6 @@ class Transaction(
 
         // Verify signatures if requested
         if (verifySignatures) {
-            val messageBytes = com.myetherwallet.mewwalletkit.solana.serialization.MessageSerializer.serializeMessage(message)
-
             signatures.forEach { sigPair ->
                 val signature = sigPair.signature
 
@@ -442,9 +562,17 @@ class Transaction(
             throw ValidationException(errors)
         }
 
-        return com.myetherwallet.mewwalletkit.solana.serialization.MessageSerializer.serializeTransaction(
-            signatures, message
-        )
+        // Serialize transaction based on version
+        return if (versionedMessage != null) {
+            com.myetherwallet.mewwalletkit.solana.serialization.MessageSerializer.serializeVersionedTransaction(
+                signatures, versionedMessage
+            )
+        } else {
+            val message = compileMessage()
+            com.myetherwallet.mewwalletkit.solana.serialization.MessageSerializer.serializeTransaction(
+                signatures, message
+            )
+        }
     }
 
     /**
@@ -584,7 +712,8 @@ class Transaction(
                     transaction.populate(rawSignatures, versionedMessage.message)
                 }
                 is VersionedMessage.V0 -> {
-                    throw IllegalArgumentException("V0 transaction deserialization not yet supported. Use Transaction.deserialize() only for Legacy transactions.")
+                    // Use the new populate overload for V0 transactions
+                    transaction.populate(rawSignatures, versionedMessage)
                 }
             }
 
