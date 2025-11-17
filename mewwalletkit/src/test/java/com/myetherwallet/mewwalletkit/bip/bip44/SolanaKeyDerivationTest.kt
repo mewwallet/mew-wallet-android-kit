@@ -40,13 +40,13 @@ class SolanaKeyDerivationTest {
             privateKeyData.toHexString()
         )
 
-        // Test 2: privateKey.ed25519() should return 64-byte key (32 private + 32 public)
+        // Test 2: privateKey.ed25519() should return 32-byte private key (same as data())
         val ed25519Key = derivedKey.ed25519()
         assertNotNull("Ed25519 key should not be null for Solana", ed25519Key)
-        assertEquals("Ed25519 key should be 64 bytes", 64, ed25519Key!!.size)
+        assertEquals("Ed25519 key should be 32 bytes", 32, ed25519Key!!.size)
         assertEquals(
             "Ed25519 key hex should match iOS",
-            "c0b9355922b6df97e88b04058dee478908328dd959adf61991d7ca64e4d27a8c5f9e678f7f5c32ead7d451255dcd2ae713d0a68dfb8ec8d952b545badc241843",
+            "c0b9355922b6df97e88b04058dee478908328dd959adf61991d7ca64e4d27a8c",
             ed25519Key.toHexString()
         )
 
