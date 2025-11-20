@@ -325,6 +325,19 @@ class Transaction(
     }
 
     /**
+     * Returns the versioned message for this transaction.
+     *
+     * If the transaction has a cached V0 versioned message (from deserialization),
+     * it returns that. Otherwise, it compiles the message and wraps it in a
+     * Legacy versioned message.
+     *
+     * @return VersionedMessage (either Legacy or V0)
+     */
+    fun getVersionedMessage(): VersionedMessage {
+        return cachedVersionedMessage ?: VersionedMessage.Legacy(compileMessage())
+    }
+
+    /**
      * Signs the transaction with the provided signers.
      *
      * This method:

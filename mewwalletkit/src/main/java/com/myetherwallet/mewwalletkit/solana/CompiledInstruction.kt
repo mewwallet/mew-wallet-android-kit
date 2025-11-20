@@ -1,5 +1,8 @@
 package com.myetherwallet.mewwalletkit.solana
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
 /**
  * A compiled transaction instruction with account keys replaced by indices.
  *
@@ -11,11 +14,12 @@ package com.myetherwallet.mewwalletkit.solana
  * @property accounts Indices into account keys array for accounts this instruction operates on
  * @property data The instruction-specific data to pass to the program
  */
+@Parcelize
 data class CompiledInstruction(
     val programIdIndex: UByte,
     val accounts: List<UByte>,
     val data: ByteArray
-) {
+): Parcelable{
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false

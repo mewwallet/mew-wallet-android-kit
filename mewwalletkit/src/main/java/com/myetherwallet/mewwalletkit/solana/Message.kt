@@ -1,6 +1,8 @@
 package com.myetherwallet.mewwalletkit.solana
 
+import android.os.Parcelable
 import com.myetherwallet.mewwalletkit.bip.bip44.PublicKey
+import kotlinx.parcelize.Parcelize
 
 /**
  * A compiled Solana transaction message (legacy format).
@@ -19,12 +21,13 @@ import com.myetherwallet.mewwalletkit.bip.bip44.PublicKey
  * @property recentBlockhash Base58-encoded recent blockhash for transaction expiry
  * @property instructions Compiled instructions with account indices instead of pubkeys
  */
+@Parcelize
 data class Message(
     val header: MessageHeader,
     val accountKeys: List<PublicKey>,
     val recentBlockhash: String,
     val instructions: List<CompiledInstruction>
-) {
+): Parcelable {
     /**
      * Returns true if the account at the given index is writable in this message.
      *

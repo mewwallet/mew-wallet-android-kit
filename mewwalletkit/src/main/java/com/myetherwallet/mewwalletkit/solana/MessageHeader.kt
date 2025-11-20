@@ -1,5 +1,8 @@
 package com.myetherwallet.mewwalletkit.solana
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
 /**
  * Header metadata for a Solana transaction message.
  *
@@ -15,8 +18,9 @@ package com.myetherwallet.mewwalletkit.solana
  * @property numReadonlySignedAccounts Number of readonly accounts that are also signers
  * @property numReadonlyUnsignedAccounts Number of readonly accounts that are not signers
  */
+@Parcelize
 data class MessageHeader(
     val numRequiredSignatures: UByte,
     val numReadonlySignedAccounts: UByte,
     val numReadonlyUnsignedAccounts: UByte
-)
+): Parcelable

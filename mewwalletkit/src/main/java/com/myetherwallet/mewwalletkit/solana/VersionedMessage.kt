@@ -1,6 +1,8 @@
 package com.myetherwallet.mewwalletkit.solana
 
+import android.os.Parcelable
 import com.myetherwallet.mewwalletkit.bip.bip44.PublicKey
+import kotlinx.parcelize.Parcelize
 
 /**
  * A versioned Solana transaction message.
@@ -12,7 +14,8 @@ import com.myetherwallet.mewwalletkit.bip.bip44.PublicKey
  * - Legacy: Original format with all accounts inline
  * - V0: Versioned format with Address Lookup Table support
  */
-sealed class VersionedMessage {
+@Parcelize
+sealed class VersionedMessage: Parcelable {
     /**
      * Transaction version (LEGACY or V0).
      */

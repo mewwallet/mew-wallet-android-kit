@@ -1,6 +1,8 @@
 package com.myetherwallet.mewwalletkit.solana
 
+import android.os.Parcelable
 import com.myetherwallet.mewwalletkit.bip.bip44.PublicKey
+import kotlinx.parcelize.Parcelize
 
 /**
  * Solana transaction message format v0.
@@ -27,13 +29,14 @@ import com.myetherwallet.mewwalletkit.bip.bip44.PublicKey
  * @property compiledInstructions Instructions with account indices
  * @property addressTableLookups ALT references with writable/readonly index lists
  */
+@Parcelize
 data class MessageV0(
     val header: MessageHeader,
     val staticAccountKeys: List<PublicKey>,
     var recentBlockhash: String,
     val compiledInstructions: List<CompiledInstruction>,
     var addressTableLookups: List<MessageAddressTableLookup> = emptyList()
-) {
+): Parcelable {
     /**
      * Transaction version (always V0).
      */

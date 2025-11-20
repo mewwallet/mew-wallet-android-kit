@@ -542,6 +542,23 @@ object MessageSerializer {
         )
     }
 
+    fun deserializeVersionedMessage(bytes: ByteArray): VersionedMessage {
+        if (bytes.isEmpty()) {
+            throw IllegalArgumentException("Empty bytes for versioned message")
+        }
+
+        val version = TransactionVersion.fromByte(bytes[0])
+
+        return when (version) {
+            TransactionVersion.LEGACY -> {
+                VersionedMessage.Legacy(deserializeMessage(bytes))
+            }
+            TransactionVersion.V0 -> {
+                VersionedMessage.V0(deserializeMessageV0(bytes))
+            }
+        }
+    }
+
     /**
      * Deserializes signatures from bytes.
      *

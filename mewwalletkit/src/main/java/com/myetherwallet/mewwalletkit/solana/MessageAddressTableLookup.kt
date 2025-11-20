@@ -1,6 +1,8 @@
 package com.myetherwallet.mewwalletkit.solana
 
+import android.os.Parcelable
 import com.myetherwallet.mewwalletkit.bip.bip44.PublicKey
+import kotlinx.parcelize.Parcelize
 
 /**
  * A reference to an Address Lookup Table in a transaction message.
@@ -17,11 +19,12 @@ import com.myetherwallet.mewwalletkit.bip.bip44.PublicKey
  * @property writableIndexes Indices of writable accounts in the ALT (max 255)
  * @property readonlyIndexes Indices of readonly accounts in the ALT (max 255)
  */
+@Parcelize
 data class MessageAddressTableLookup(
     val accountKey: PublicKey,
     val writableIndexes: List<UByte>,
     val readonlyIndexes: List<UByte>
-) {
+): Parcelable {
     init {
         require(writableIndexes.size <= 255) {
             "writableIndexes cannot exceed 255, got ${writableIndexes.size}"
