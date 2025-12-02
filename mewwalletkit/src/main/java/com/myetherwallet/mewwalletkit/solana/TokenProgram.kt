@@ -8,6 +8,7 @@ import java.nio.ByteOrder
 
 object TokenProgram {
     const val PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+    const val ACCOUNT_SIZE: Int = 165
 
     fun programId(): PublicKey {
         val alphabet = Network.SOLANA.alphabet()
