@@ -1,6 +1,7 @@
 package com.myetherwallet.mewwalletkit.solana
 
 import android.os.Parcelable
+import androidx.annotation.VisibleForTesting
 import com.myetherwallet.mewwalletkit.bip.bip44.PrivateKey
 import com.myetherwallet.mewwalletkit.bip.bip44.PublicKey
 import com.myetherwallet.mewwalletkit.core.extension.signSolanaMessage
@@ -353,7 +354,8 @@ class Transaction(
      * @throws IllegalStateException if message compilation fails
      * @throws IllegalArgumentException if any required signer is missing or keys are invalid
      */
-    fun sign(signers: List<PrivateKey>) {
+    @VisibleForTesting
+    internal fun sign(signers: List<PrivateKey>) {
         require(signers.isNotEmpty()) { "At least one signer is required" }
 
         // 1. Clear existing signatures and extra signers
@@ -384,7 +386,8 @@ class Transaction(
      *
      * @param signers Variable number of private keys to sign with
      */
-    fun sign(vararg signers: PrivateKey) {
+    @VisibleForTesting
+    internal fun sign(vararg signers: PrivateKey) {
         sign(signers.toList())
     }
 
