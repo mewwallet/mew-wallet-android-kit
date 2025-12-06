@@ -44,6 +44,9 @@ class VersionedTransaction(
     val recentBlockhash: String
         get() = message.recentBlockhash
 
+    val compiledInstructions: List<CompiledInstruction>
+        get() = message.compiledInstructions
+
     fun sign(signer: PrivateKey) {
         sign(listOf(signer))
     }
