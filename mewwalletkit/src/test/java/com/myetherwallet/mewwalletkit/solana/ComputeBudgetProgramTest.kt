@@ -68,11 +68,8 @@ class ComputeBudgetProgramTest {
 
         // Additional verification: decode the value back
         assertEquals(2, instruction.data[0].toInt())
-        val decodedUnits = (instruction.data[1].toInt() and 0xFF) or
-                ((instruction.data[2].toInt() and 0xFF) shl 8) or
-                ((instruction.data[3].toInt() and 0xFF) shl 16) or
-                ((instruction.data[4].toInt() and 0xFF) shl 24)
-        assertEquals(units.toInt(), decodedUnits)
+        val decodedUnits = ComputeBudgetProgram.getComputeUnitLimit(instruction.data)
+        assertEquals(units, decodedUnits)
     }
 
     @Test
@@ -101,15 +98,8 @@ class ComputeBudgetProgramTest {
 
         // Additional verification: decode the value back
         assertEquals(3, instruction.data[0].toInt())
-        val decodedMicroLamports = (instruction.data[1].toLong() and 0xFF) or
-                ((instruction.data[2].toLong() and 0xFF) shl 8) or
-                ((instruction.data[3].toLong() and 0xFF) shl 16) or
-                ((instruction.data[4].toLong() and 0xFF) shl 24) or
-                ((instruction.data[5].toLong() and 0xFF) shl 32) or
-                ((instruction.data[6].toLong() and 0xFF) shl 40) or
-                ((instruction.data[7].toLong() and 0xFF) shl 48) or
-                ((instruction.data[8].toLong() and 0xFF) shl 56)
-        assertEquals(microLamports.toLong(), decodedMicroLamports)
+        val decodedMicroLamports = ComputeBudgetProgram.getComputeUnitPrice(instruction.data)
+        assertEquals(microLamports, decodedMicroLamports)
     }
 
     @Test

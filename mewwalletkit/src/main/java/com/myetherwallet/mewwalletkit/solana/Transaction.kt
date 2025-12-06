@@ -29,13 +29,28 @@ import org.bouncycastle.crypto.signers.Ed25519Signer
 @Parcelize
 class Transaction(
     var feePayer: PublicKey? = null,
-    var recentBlockhash: String? = null
 ): Parcelable {
     private val signatures: MutableList<SignaturePubkeyPair> = mutableListOf()
     private val instructions: MutableList<TransactionInstruction> = mutableListOf()
     private val extraSigners: MutableList<PublicKey> = mutableListOf()
     private var cachedMessage: Message? = null
 
+    constructor(
+        feePayer: PublicKey? = null,
+        recentBlockhash: String? = null
+    ) : this(feePayer) {
+        this.recentBlockhash = recentBlockhash
+    }
+
+    var recentBlockhash: String? = null
+        set(value) {
+            value?.let {
+                cachedVersionedMessage?.recentBlockhash = value
+                cachedMessage?.recentBlockhash = value
+            }
+
+            field = value
+        }
     /**
      * Cached versioned message (for V0 transactions).
      * When set, this takes precedence over cachedMessage.

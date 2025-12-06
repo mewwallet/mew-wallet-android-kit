@@ -155,6 +155,38 @@ class VersionedTransactionTest {
     }
 
     @Test
+    fun `test serialize and deserialize V0 transaction should expect recentBlockhash`() {
+        val privateKeyHex = "94c8ae05bf067d52a6c88e85993c3f1bcf7a3b560d42bba4bada7c8a45c7f93e"
+        val privateKey = PrivateKey.createWithPrivateKey(privateKeyHex.hexToByteArray(), Network.SOLANA)
+
+        val publicKey = privateKey.publicKey()!!
+        val keys = listOf(publicKey)
+
+        val messageV0 = MessageV0(
+            header = MessageHeader(1u, 0u, 0u),
+            staticAccountKeys = keys,
+            recentBlockhash = "EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k",
+            compiledInstructions = emptyList(),
+            addressTableLookups = emptyList()
+        )
+
+        val versionedMessage = VersionedMessage.V0(messageV0)
+        val versionedTx = VersionedTransaction(versionedMessage)
+        versionedTx.sign(privateKey)
+
+        val serialized = versionedTx.serialize()
+
+        val expectedRecentBlockhash = "11111111111111111111111111111111"
+        val deserializedTransaction = Transaction.deserialize(serialized)
+        deserializedTransaction.recentBlockhash = expectedRecentBlockhash
+        val deserialized = VersionedTransaction.fromTransaction(deserializedTransaction)
+        val serializedVersionedTransaction = deserialized.serialize()
+        val transaction = Transaction.deserialize(serializedVersionedTransaction)
+
+        assertEquals(expectedRecentBlockhash, transaction.recentBlockhash)
+    }
+
+    @Test
     fun `test addSignature with valid signer`() {
         val privateKeyHex = "94c8ae05bf067d52a6c88e85993c3f1bcf7a3b560d42bba4bada7c8a45c7f93e"
         val privateKey = PrivateKey.createWithPrivateKey(privateKeyHex.hexToByteArray(), Network.SOLANA)

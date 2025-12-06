@@ -25,7 +25,7 @@ import kotlinx.parcelize.Parcelize
 data class Message(
     val header: MessageHeader,
     val accountKeys: List<PublicKey>,
-    val recentBlockhash: String,
+    var recentBlockhash: String,
     val instructions: List<CompiledInstruction>
 ): Parcelable {
     /**
