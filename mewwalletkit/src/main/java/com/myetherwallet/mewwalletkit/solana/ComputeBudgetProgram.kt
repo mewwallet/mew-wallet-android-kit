@@ -101,7 +101,7 @@ object ComputeBudgetProgram {
     }
 
     fun getComputeUnitLimit(data: ByteArray): UInt? {
-        if (data[0] == InstructionIndex.SET_COMPUTE_UNIT_LIMIT.toByte() && data.size == 5) {
+        if (data.size == 5 && data[0] == InstructionIndex.SET_COMPUTE_UNIT_LIMIT.toByte()) {
             val decodedUnits = (data[1].toInt() and 0xFF) or
                     ((data[2].toInt() and 0xFF) shl 8) or
                     ((data[3].toInt() and 0xFF) shl 16) or
@@ -142,7 +142,7 @@ object ComputeBudgetProgram {
 
 
     fun getComputeUnitPrice(data: ByteArray): ULong? {
-        if (data[0] == InstructionIndex.SET_COMPUTE_UNIT_PRICE.toByte() && data.size == 9) {
+        if (data.size == 9 && data[0] == InstructionIndex.SET_COMPUTE_UNIT_PRICE.toByte()) {
             val decodedMicroLamports = (data[1].toLong() and 0xFF) or
                     ((data[2].toLong() and 0xFF) shl 8) or
                     ((data[3].toLong() and 0xFF) shl 16) or
