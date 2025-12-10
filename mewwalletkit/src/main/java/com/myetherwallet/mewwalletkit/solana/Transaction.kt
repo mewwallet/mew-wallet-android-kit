@@ -1,0 +1,754 @@
+package com.myetherwallet.mewwalletkit.solana
+
+import android.os.Parcelable
+import androidx.annotation.VisibleForTesting
+import com.myetherwallet.mewwalletkit.bip.bip44.PrivateKey
+import com.myetherwallet.mewwalletkit.bip.bip44.PublicKey
+import com.myetherwallet.mewwalletkit.core.extension.signSolanaMessage
+import kotlinx.parcelize.IgnoredOnParcel
+import kotlinx.parcelize.Parcelize
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
+import org.bouncycastle.crypto.signers.Ed25519Signer
+
+/**
+ * A Solana transaction in the process of being built.
+ *
+ * This class uses a builder pattern with mutable state. Instructions and signatures
+ * can be added incrementally before compilation and signing.
+ *
+ * Lifecycle:
+ * 1. Create transaction with fee payer and blockhash
+ * 2. Add instructions
+ * 3. Compile to Message (automatic during signing)
+ * 4. Sign with required signers
+ * 5. Serialize for broadcast
+ *
+ * @property feePayer The account that will pay transaction fees (defaults to first signer if not set)
+ * @property recentBlockhash Recent blockhash for transaction expiry (required before signing)
+ */
+@Parcelize
+class Transaction(
+    var feePayer: PublicKey? = null,
+): Parcelable {
+    private val signatures: MutableList<SignaturePubkeyPair> = mutableListOf()
+    private val instructions: MutableList<TransactionInstruction> = mutableListOf()
+    private val extraSigners: MutableList<PublicKey> = mutableListOf()
+    private var cachedMessage: Message? = null
+
+    constructor(
+        feePayer: PublicKey? = null,
+        recentBlockhash: String? = null
+    ) : this(feePayer) {
+        this.recentBlockhash = recentBlockhash
+    }
+
+    var recentBlockhash: String? = null
+        set(value) {
+            value?.let {
+                cachedVersionedMessage?.recentBlockhash = value
+                cachedMessage?.recentBlockhash = value
+            }
+
+            field = value
+        }
+    /**
+     * Cached versioned message (for V0 transactions).
+     * When set, this takes precedence over cachedMessage.
+     */
+    @IgnoredOnParcel
+    private var cachedVersionedMessage: VersionedMessage? = null
+
+    /**
+     * Transaction version (LEGACY or V0).
+     * Returns LEGACY by default, or the version from cachedVersionedMessage if present.
+     */
+    val version: TransactionVersion
+        get() = cachedVersionedMessage?.version ?: TransactionVersion.LEGACY
+
+    /**
+     * Adds an instruction to this transaction.
+     * Invalidates the cached compiled message.
+     */
+    fun add(instruction: TransactionInstruction) {
+        instructions.add(instruction)
+        cachedMessage = null
+    }
+
+    /**
+     * Adds multiple instructions to this transaction.
+     * Invalidates the cached compiled message.
+     */
+    fun add(vararg instructions: TransactionInstruction) {
+        instructions.forEach { add(it) }
+    }
+
+    /**
+     * Returns an immutable copy of the current instructions.
+     */
+    fun getInstructions(): List<TransactionInstruction> = instructions.toList()
+
+    /**
+     * Returns an immutable copy of the current signatures.
+     */
+    fun getSignatures(): List<SignaturePubkeyPair> = signatures.toList()
+
+    /**
+     * Populates this transaction from deserialized signatures and message.
+     *
+     * This method is used for reconstructing a transaction from wire format.
+     * It extracts transaction instructions from the compiled message and sets up
+     * the signature slots for all required signers.
+     *
+     * @param rawSignatures List of 64-byte signature arrays (may be all zeros for unsigned)
+     * @param message The compiled message containing all transaction data
+     */
+    fun populate(rawSignatures: List<ByteArray>, message: Message) {
+        // Clear existing state
+        signatures.clear()
+        instructions.clear()
+        extraSigners.clear()
+        cachedMessage = null
+
+        // Set basic properties from message
+        this.recentBlockhash = message.recentBlockhash
+        this.feePayer = message.accountKeys.firstOrNull()
+
+        // Set cached message
+        this.cachedMessage = message
+
+        // Reconstruct signature pairs
+        val numSigners = message.header.numRequiredSignatures.toInt()
+        for (i in 0 until numSigners) {
+            val publicKey = message.accountKeys[i]
+            val signature = if (i < rawSignatures.size) {
+                // Check if signature is all zeros (unsigned)
+                if (rawSignatures[i].all { it == 0.toByte() }) {
+                    null
+                } else {
+                    rawSignatures[i]
+                }
+            } else {
+                null
+            }
+
+            signatures.add(SignaturePubkeyPair(signature, publicKey))
+        }
+
+        // Reconstruct instructions from compiled instructions
+        message.instructions.forEach { compiledInstruction ->
+            val programId = message.accountKeys[compiledInstruction.programIdIndex.toInt()]
+            val keys = compiledInstruction.accounts.map { accountIndex ->
+                val accountIndexInt = accountIndex.toInt()
+                val publicKey = message.accountKeys[accountIndexInt]
+                val isSigner = message.isAccountSigner(accountIndexInt)
+                val isWritable = message.isAccountWritable(accountIndexInt)
+                AccountMeta(publicKey, isSigner, isWritable)
+            }
+
+            instructions.add(
+                TransactionInstruction(
+                    programId = programId,
+                    keys = keys,
+                    data = compiledInstruction.data
+                )
+            )
+        }
+    }
+
+    /**
+     * Populates this transaction from deserialized signatures and versioned message.
+     *
+     * This method is used for reconstructing a transaction from V0 wire format.
+     * It extracts transaction instructions from the versioned message and sets up
+     * the signature slots for all required signers.
+     *
+     * For V0 transactions with Address Lookup Tables, instructions cannot be fully
+     * reconstructed without the ALT data. In this case, only signatures and basic
+     * properties are populated, and the versioned message is cached.
+     *
+     * @param rawSignatures List of 64-byte signature arrays (may be all zeros for unsigned)
+     * @param versionedMessage The versioned message containing all transaction data (Legacy or V0)
+     */
+    fun populate(rawSignatures: List<ByteArray>, versionedMessage: VersionedMessage) {
+        // Clear existing state
+        signatures.clear()
+        instructions.clear()
+        extraSigners.clear()
+        cachedMessage = null
+        cachedVersionedMessage = null
+
+        // Set basic properties from versioned message
+        this.recentBlockhash = versionedMessage.recentBlockhash
+        this.feePayer = versionedMessage.staticAccountKeys.firstOrNull()
+
+        // Cache the versioned message
+        this.cachedVersionedMessage = versionedMessage
+
+        // Reconstruct signature pairs
+        val numSigners = versionedMessage.header.numRequiredSignatures.toInt()
+        for (i in 0 until numSigners) {
+            val publicKey = versionedMessage.staticAccountKeys[i]
+            val signature = if (i < rawSignatures.size) {
+                // Check if signature is all zeros (unsigned)
+                if (rawSignatures[i].all { it == 0.toByte() }) {
+                    null
+                } else {
+                    rawSignatures[i]
+                }
+            } else {
+                null
+            }
+
+            signatures.add(SignaturePubkeyPair(signature, publicKey))
+        }
+
+        // For V0 transactions with ALTs, we cannot reconstruct instructions without ALT data
+        // Only reconstruct for Legacy or V0 without ALT lookups
+        when (versionedMessage) {
+            is VersionedMessage.Legacy -> {
+                // Reconstruct instructions from compiled instructions
+                versionedMessage.compiledInstructions.forEach { compiledInstruction ->
+                    val programId = versionedMessage.staticAccountKeys[compiledInstruction.programIdIndex.toInt()]
+                    val keys = compiledInstruction.accounts.map { accountIndex ->
+                        val accountIndexInt = accountIndex.toInt()
+                        val publicKey = versionedMessage.staticAccountKeys[accountIndexInt]
+                        val isSigner = versionedMessage.isAccountSigner(accountIndexInt)
+                        val isWritable = versionedMessage.isAccountWritable(accountIndexInt)
+                        AccountMeta(publicKey, isSigner, isWritable)
+                    }
+
+                    instructions.add(
+                        TransactionInstruction(
+                            programId = programId,
+                            keys = keys,
+                            data = compiledInstruction.data
+                        )
+                    )
+                }
+            }
+            is VersionedMessage.V0 -> {
+                // For V0, only reconstruct if no ALT lookups are present
+                if (versionedMessage.message.addressTableLookups.isEmpty()) {
+                    versionedMessage.compiledInstructions.forEach { compiledInstruction ->
+                        val programId = versionedMessage.staticAccountKeys[compiledInstruction.programIdIndex.toInt()]
+                        val keys = compiledInstruction.accounts.map { accountIndex ->
+                            val accountIndexInt = accountIndex.toInt()
+                            val publicKey = versionedMessage.staticAccountKeys[accountIndexInt]
+                            val isSigner = versionedMessage.isAccountSigner(accountIndexInt)
+                            val isWritable = versionedMessage.isAccountWritable(accountIndexInt)
+                            AccountMeta(publicKey, isSigner, isWritable)
+                        }
+
+                        instructions.add(
+                            TransactionInstruction(
+                                programId = programId,
+                                keys = keys,
+                                data = compiledInstruction.data
+                            )
+                        )
+                    }
+                }
+                // If ALT lookups are present, instructions remain empty
+                // The transaction can still be serialized using the cached versioned message
+            }
+        }
+    }
+
+    /**
+     * Compiles the transaction into an immutable Message.
+     *
+     * This process:
+     * 1. Validates recentBlockhash and feePayer are set
+     * 2. Collects all accounts from instructions (including program IDs)
+     * 3. Deduplicates and merges account flags
+     * 4. Sorts accounts in Solana's required order
+     * 5. Generates MessageHeader with account counts
+     * 6. Compiles instructions (replaces pubkeys with indices)
+     *
+     * The result is cached until the transaction is modified.
+     *
+     * @throws IllegalStateException if recentBlockhash is null
+     * @throws IllegalStateException if feePayer cannot be determined
+     * @throws IllegalArgumentException if feePayer is not a signer
+     * @return The compiled message ready for signing
+     */
+    fun compileMessage(): Message {
+        // Return cached message if available
+        cachedMessage?.let { return it }
+
+        // Validate required fields
+        val blockhash = recentBlockhash
+            ?: throw IllegalStateException("recentBlockhash must be set before compiling message")
+
+        // Determine fee payer (use explicit feePayer or first signature)
+        val payer = feePayer ?: signatures.firstOrNull()?.publicKey
+            ?: throw IllegalStateException("feePayer must be set or transaction must have at least one signature")
+
+        // Collect all accounts from instructions
+        val allAccounts = CompiledKeys.collectAccounts(instructions)
+
+        // Add extra signers to account list
+        val accountsWithExtras = if (extraSigners.isNotEmpty()) {
+            allAccounts + extraSigners.map { AccountMeta(it, isSigner = true, isWritable = false) }
+        } else {
+            allAccounts
+        }
+
+        // Deduplicate and merge flags
+        val deduplicated = CompiledKeys.deduplicateAndMerge(accountsWithExtras)
+
+        // Sort accounts and generate header
+        val (sortedKeys, header) = CompiledKeys.sortAndCreateHeader(deduplicated, payer)
+
+        // Compile instructions
+        val compiledInstructions = CompiledKeys.compileInstructions(instructions, sortedKeys)
+
+        // Create message
+        val message = Message(
+            header = header,
+            accountKeys = sortedKeys,
+            recentBlockhash = blockhash,
+            instructions = compiledInstructions
+        )
+
+        // Populate or reorder signatures array to match sorted keys
+        val numSigners = header.numRequiredSignatures.toInt()
+        if (signatures.isEmpty()) {
+            // Create null signature slots for all required signers
+            for (i in 0 until numSigners) {
+                signatures.add(SignaturePubkeyPair(
+                    signature = null, // unsigned
+                    publicKey = sortedKeys[i] // First N keys are signers
+                ))
+            }
+        } else {
+            // Reorder existing signatures to match sortedKeys order
+            val existingSignatures = signatures.associateBy { it.publicKey }
+            signatures.clear()
+            for (i in 0 until numSigners) {
+                val existingSig = existingSignatures[sortedKeys[i]]
+                signatures.add(SignaturePubkeyPair(
+                    signature = existingSig?.signature, // Preserve existing signature
+                    publicKey = sortedKeys[i]
+                ))
+            }
+        }
+
+        // Cache the compiled message
+        cachedMessage = message
+
+        return message
+    }
+
+    /**
+     * Returns the versioned message for this transaction.
+     *
+     * If the transaction has a cached V0 versioned message (from deserialization),
+     * it returns that. Otherwise, it compiles the message and wraps it in a
+     * Legacy versioned message.
+     *
+     * @return VersionedMessage (either Legacy or V0)
+     */
+    fun getVersionedMessage(): VersionedMessage {
+        return cachedVersionedMessage ?: VersionedMessage.Legacy(compileMessage())
+    }
+
+    /**
+     * Signs the transaction with the provided signers.
+     *
+     * This method:
+     * 1. Clears any existing signatures
+     * 2. Compiles the message (populates signature slots for ALL required signers)
+     * 3. Deduplicates provided signers by public key
+     * 4. Signs the message with each provided signer's Ed25519 private key
+     *
+     * Note: This method resets ALL signatures. Use partialSign() to add signatures
+     * without clearing existing ones.
+     *
+     * @param signers List of private keys to sign with (must include fee payer)
+     * @throws IllegalStateException if message compilation fails
+     * @throws IllegalArgumentException if any required signer is missing or keys are invalid
+     */
+    @VisibleForTesting
+    internal fun sign(signers: List<PrivateKey>) {
+        require(signers.isNotEmpty()) { "At least one signer is required" }
+
+        // 1. Clear existing signatures and extra signers
+        signatures.clear()
+        extraSigners.clear()
+
+        // 2. Store all signers as extra signers
+        val publicKeys = signers.mapNotNull { it.publicKey() }
+        extraSigners.addAll(publicKeys)
+
+        // 3. Set feePayer to first signer if not already set
+        if (feePayer == null && publicKeys.isNotEmpty()) {
+            feePayer = publicKeys.first()
+        }
+
+        // 4. Compile message (includes extraSigners in account list)
+        val message = compileMessage()
+
+        // 5. Deduplicate signers by public key
+        val uniqueSigners = signers.distinctBy { it.publicKey() }
+
+        // 6. Sign with each signer
+        partialSignInternal(message, uniqueSigners)
+    }
+
+    /**
+     * Signs the transaction with the provided signers (vararg version).
+     *
+     * @param signers Variable number of private keys to sign with
+     */
+    @VisibleForTesting
+    internal fun sign(vararg signers: PrivateKey) {
+        sign(signers.toList())
+    }
+
+    /**
+     * Partially signs the transaction with the provided signers.
+     *
+     * Does not replace existing signatures, only adds/updates signatures for
+     * the provided signers. Useful for multi-signature workflows where signatures
+     * are collected incrementally.
+     *
+     * @param signers List of private keys to sign with
+     * @throws IllegalStateException if message compilation fails
+     * @throws IllegalArgumentException if keys are invalid
+     */
+    fun partialSign(signers: List<PrivateKey>) {
+        require(signers.isNotEmpty()) { "At least one signer is required" }
+
+        // Preserve existing signature slots by adding them to extraSigners before compilation
+        if (signatures.isNotEmpty()) {
+            val existingPublicKeys = signatures.map { it.publicKey }
+            extraSigners.clear()
+            extraSigners.addAll(existingPublicKeys)
+        }
+
+        // Deduplicate signers by public key
+        val uniqueSigners = signers.distinctBy { it.publicKey() }
+
+        // Compile message to ensure signature array is populated
+        val message = compileMessage()
+
+        // Sign with provided signers (preserves existing signatures)
+        partialSignInternal(message, uniqueSigners)
+    }
+
+    /**
+     * Partially signs the transaction with the provided signers (vararg version).
+     *
+     * @param signers Variable number of private keys to sign with
+     */
+    fun partialSign(vararg signers: PrivateKey) {
+        partialSign(signers.toList())
+    }
+
+    /**
+     * Sets the required signers for the transaction without signing.
+     *
+     * This method initializes empty signature slots for the specified public keys,
+     * allowing signatures to be added later via partialSign() or addSignature().
+     * Useful for multi-signature workflows where signatures are collected separately.
+     *
+     * This method directly sets the signature slots without compiling the message,
+     * allowing signers to be specified even if they're not yet part of any instruction.
+     *
+     * Note: This method clears any existing signatures and sets the feePayer to the first signer.
+     *
+     * @param signers List of public keys that will sign this transaction
+     * @throws IllegalArgumentException if signers list is empty
+     */
+    fun setSigners(signers: List<PublicKey>) {
+        require(signers.isNotEmpty()) { "At least one signer is required" }
+
+        // Set feePayer to first signer if not already set
+        if (feePayer == null) {
+            feePayer = signers.first()
+        }
+
+        // Deduplicate signers by public key
+        val uniqueSigners = signers.distinctBy { it }
+
+        // Clear and set signature slots directly
+        signatures.clear()
+        uniqueSigners.forEach { publicKey ->
+            signatures.add(SignaturePubkeyPair(
+                signature = null,
+                publicKey = publicKey
+            ))
+        }
+
+        // Invalidate cached message since we changed signature structure
+        cachedMessage = null
+    }
+
+    /**
+     * Sets the required signers for the transaction without signing (vararg version).
+     *
+     * @param signers Variable number of public keys that will sign this transaction
+     */
+    fun setSigners(vararg signers: PublicKey) {
+        setSigners(signers.toList())
+    }
+
+    /**
+     * Adds an external signature to the transaction.
+     *
+     * Useful when a signature is created externally (e.g., by a hardware wallet
+     * or remote signer) and needs to be added to the transaction.
+     *
+     * @param pubkey The public key that created the signature
+     * @param signature The 64-byte Ed25519 signature
+     * @throws IllegalStateException if message compilation fails
+     * @throws IllegalArgumentException if signature is invalid or pubkey not found
+     */
+    fun addSignature(pubkey: PublicKey, signature: ByteArray) {
+        // Compile message to ensure signature slots are populated
+        compileMessage()
+
+        // Add the signature
+        addSignatureInternal(pubkey, signature)
+    }
+
+    /**
+     * Serializes the transaction for broadcast to the network.
+     *
+     * Wire format:
+     * - Compact array of signatures (64 bytes each, zeros if unsigned)
+     * - Message (header + accounts + blockhash + instructions)
+     *
+     * @param requireAllSignatures Whether to fail if any signature is missing
+     * @param verifySignatures Whether to verify Ed25519 signatures
+     * @return Serialized transaction bytes ready for broadcast
+     * @throws ValidationException if signature validation fails (missing or invalid signatures)
+     */
+    fun serialize(requireAllSignatures: Boolean = true, verifySignatures: Boolean = true): ByteArray {
+        // Check if this is a V0 transaction (from deserialization)
+        val versionedMessage = cachedVersionedMessage
+
+        // For V0, use cached versioned message; for Legacy, compile message
+        val messageBytes = if (versionedMessage != null) {
+            com.myetherwallet.mewwalletkit.solana.serialization.MessageSerializer.serializeVersionedMessage(versionedMessage)
+        } else {
+            val message = compileMessage()
+            com.myetherwallet.mewwalletkit.solana.serialization.MessageSerializer.serializeMessage(message)
+        }
+
+        // Collect all validation errors
+        val errors = mutableListOf<ValidationError>()
+
+        // Check for missing signatures if required
+        if (requireAllSignatures) {
+            signatures.forEach { sigPair ->
+                if (sigPair.signature == null) {
+                    errors.add(ValidationError.MissingSignature(sigPair.publicKey))
+                }
+            }
+        }
+
+        // Verify signatures if requested
+        if (verifySignatures) {
+            signatures.forEach { sigPair ->
+                val signature = sigPair.signature
+
+                // Skip null signatures if not required
+                if (signature == null) {
+                    if (requireAllSignatures) {
+                        // Already added as missing signature above
+                    }
+                    return@forEach
+                }
+
+                // Validate signature is 64 bytes
+                if (signature.size != 64) {
+                    errors.add(ValidationError.InvalidSignature(sigPair.publicKey))
+                    return@forEach
+                }
+
+                // Create Ed25519 public key parameters
+                val publicKeyBytes = sigPair.publicKey.data()
+                if (publicKeyBytes.size != 32) {
+                    errors.add(ValidationError.InvalidSignature(sigPair.publicKey))
+                    return@forEach
+                }
+
+                val publicKeyParams = Ed25519PublicKeyParameters(publicKeyBytes, 0)
+
+                // Create verifier and verify signature
+                val verifier = Ed25519Signer()
+                verifier.init(false, publicKeyParams)  // false = verify mode
+                verifier.update(messageBytes, 0, messageBytes.size)
+
+                if (!verifier.verifySignature(signature)) {
+                    errors.add(ValidationError.InvalidSignature(sigPair.publicKey))
+                }
+            }
+        }
+
+        // Throw ValidationException if any errors were found
+        if (errors.isNotEmpty()) {
+            throw ValidationException(errors)
+        }
+
+        // Serialize transaction based on version
+        return if (versionedMessage != null) {
+            com.myetherwallet.mewwalletkit.solana.serialization.MessageSerializer.serializeVersionedTransaction(
+                signatures, versionedMessage
+            )
+        } else {
+            val message = compileMessage()
+            com.myetherwallet.mewwalletkit.solana.serialization.MessageSerializer.serializeTransaction(
+                signatures, message
+            )
+        }
+    }
+
+    /**
+     * Serializes just the message portion (for signing).
+     *
+     * This is the data that gets signed by Ed25519. It does not include signatures.
+     *
+     * Wire format:
+     * - MessageHeader (3 bytes)
+     * - Compact array of account keys
+     * - Recent blockhash (32 bytes)
+     * - Compact array of compiled instructions
+     *
+     * @return Serialized message bytes ready for signing
+     */
+    fun serializeMessage(): ByteArray {
+        val message = compileMessage()
+        return com.myetherwallet.mewwalletkit.solana.serialization.MessageSerializer.serializeMessage(message)
+    }
+
+    /**
+     * Verifies all signatures in the transaction.
+     *
+     * Uses Ed25519 signature verification via BouncyCastle to validate that each
+     * signature was created by the corresponding public key signing the message bytes.
+     *
+     * @param requireAllSignatures Whether to fail if any signature is missing
+     * @return true if all present signatures are valid, false otherwise
+     */
+    fun verifySignatures(requireAllSignatures: Boolean = true): Boolean {
+        // Compile message and get bytes to verify against
+        val message = compileMessage()
+        val messageBytes = com.myetherwallet.mewwalletkit.solana.serialization.MessageSerializer.serializeMessage(message)
+
+        // Check for missing signatures
+        val missingSigs = signatures.filter { it.signature == null }
+        if (requireAllSignatures && missingSigs.isNotEmpty()) {
+            return false
+        }
+
+        // Verify each present signature
+        signatures.forEach { sigPair ->
+            val signature = sigPair.signature ?: return@forEach  // Skip null signatures
+
+            // Validate signature is 64 bytes
+            if (signature.size != 64) {
+                return false
+            }
+
+            // Create Ed25519 public key parameters
+            val publicKeyBytes = sigPair.publicKey.data()
+            if (publicKeyBytes.size != 32) {
+                return false
+            }
+
+            val publicKeyParams = Ed25519PublicKeyParameters(publicKeyBytes, 0)
+
+            // Create verifier and verify signature
+            val verifier = Ed25519Signer()
+            verifier.init(false, publicKeyParams)  // false = verify mode
+            verifier.update(messageBytes, 0, messageBytes.size)
+
+            if (!verifier.verifySignature(signature)) {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    /**
+     * Internal helper for partial signing.
+     *
+     * Serializes the message and signs it with each provided signer's Ed25519 private key.
+     *
+     * @param message The compiled message to sign
+     * @param signers The private keys to sign with
+     */
+    private fun partialSignInternal(message: Message, signers: List<PrivateKey>) {
+        // Serialize message for signing
+        val messageBytes = com.myetherwallet.mewwalletkit.solana.serialization.MessageSerializer.serializeMessage(message)
+
+        // Sign with each signer
+        signers.forEach { signer ->
+            // Get the 32-byte Ed25519 private key seed
+            val privateKey = signer.ed25519()
+
+            // Sign the message using BouncyCastle Ed25519
+            val signature = messageBytes.signSolanaMessage(privateKey ?: throw IllegalArgumentException("Invalid signer private key"))
+
+            // Add signature to the transaction
+            val publicKey = signer.publicKey() ?: throw IllegalArgumentException("Invalid signer public key")
+            addSignatureInternal(publicKey, signature)
+        }
+    }
+
+    /**
+     * Internal helper for adding a signature.
+     *
+     * Finds the signature slot for the given public key and updates it with the signature.
+     *
+     * @param pubkey The public key that created the signature
+     * @param signature The 64-byte Ed25519 signature
+     * @throws IllegalArgumentException if signature is invalid or public key not found
+     */
+    private fun addSignatureInternal(pubkey: PublicKey, signature: ByteArray) {
+        require(signature.size == 64) { "Ed25519 signature must be exactly 64 bytes, got ${signature.size}" }
+
+        // Find the signature slot for this public key
+        val index = signatures.indexOfFirst { it.publicKey == pubkey }
+        require(index >= 0) {
+            "Public key ${pubkey.address()?.address ?: "unknown"} not found in required signers. " +
+            "Ensure the transaction has been compiled and the public key is part of the transaction."
+        }
+
+        // Update the signature
+        signatures[index].signature = signature
+    }
+
+    companion object {
+        /**
+         * Deserializes a transaction from wire format bytes.
+         *
+         * This method parses the transaction bytes and reconstructs a Transaction object
+         * with all signatures, message data, and instructions.
+         *
+         * @param bytes The transaction bytes to deserialize
+         * @return Deserialized Transaction object
+         */
+        fun deserialize(bytes: ByteArray): Transaction {
+            val (rawSignatures, versionedMessage) = com.myetherwallet.mewwalletkit.solana.serialization.MessageSerializer.deserializeTransaction(bytes)
+
+            val transaction = Transaction()
+
+            when (versionedMessage) {
+                is VersionedMessage.Legacy -> {
+                    transaction.populate(rawSignatures, versionedMessage.message)
+                }
+                is VersionedMessage.V0 -> {
+                    // Use the new populate overload for V0 transactions
+                    transaction.populate(rawSignatures, versionedMessage)
+                }
+            }
+
+            return transaction
+        }
+    }
+}

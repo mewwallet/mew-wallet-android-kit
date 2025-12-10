@@ -3,7 +3,6 @@ package com.myetherwallet.mewwalletkit.bip.bip44
 import com.myetherwallet.mewwalletkit.bip.bip44.exception.InvalidDataException
 import com.myetherwallet.mewwalletkit.core.extension.*
 import com.myetherwallet.mewwalletkit.core.util.HMAC
-import com.myetherwallet.mewwalletkit.eip.eip155.Transaction
 import java.math.BigInteger
 import java.nio.ByteOrder
 
@@ -200,15 +199,11 @@ class PrivateKey private constructor(
 
     override fun address() = publicKey()?.address()
 
-    /**
-     * Returns 64-byte Ed25519 secret key (32-byte private + 32-byte public)
-     * Only for Solana network
-     */
     fun ed25519(): ByteArray? {
         return when (network) {
             Network.SOLANA -> {
                 val (privateKey, publicKey) = rawPrivateKey.generateEd25519KeyPair()
-                privateKey + publicKey // 64 bytes total
+                privateKey // 32 bytes total
             }
             else -> null
         }

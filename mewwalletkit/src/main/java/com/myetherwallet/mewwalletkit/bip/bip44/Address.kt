@@ -39,6 +39,15 @@ class Address constructor(val address: String) : Parcelable {
         } else {
             null
         }
+
+        fun createSolana(solanaAddress: String): Address? {
+            return try {
+                PublicKey.createWithBase58(solanaAddress, Network.SOLANA)
+                createRaw(solanaAddress)
+            } catch (_: Exception) {
+                null
+            }
+        }
     }
 
     fun isDefault() = address.isEmpty() || address == DEFAULT_API_CONTRACT
