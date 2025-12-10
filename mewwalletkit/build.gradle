@@ -65,6 +65,9 @@ dependencies {
     // JSON
     implementation "com.google.code.gson:gson:$gson_version"
 
+    // Solana Dependencies - Using Bouncy Castle for Ed25519
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.77'
+
     // Testing
     testImplementation "junit:junit:$junit_version"
     androidTestImplementation "androidx.test:runner:$androidx_test_runner_version"
@@ -72,5 +75,8 @@ dependencies {
 }
 
 repositories {
+    google()
     mavenCentral()
+    maven { url 'https://jitpack.io' }
+    maven { url 'https://repo1.maven.org/maven2/' }
 }

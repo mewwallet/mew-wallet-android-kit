@@ -10,6 +10,6 @@ import java.nio.ByteOrder
 fun Int.toByteArray(byteOrder: ByteOrder = ByteOrder.nativeOrder()): ByteArray =
     ByteBuffer
         .allocate(Int.SIZE_BYTES)
+        .order(byteOrder)  // Set byte order BEFORE putting the value
         .putInt(this)
-        .order(byteOrder)
         .array()

@@ -28,7 +28,7 @@ class EIP55Test {
     @Test
     fun `Should correctly format data`() {
         for (vector in testVectors) {
-            val data = vector.toLowerCase().hexToByteArray()
+            val data = vector.lowercase().hexToByteArray()
             Assert.assertEquals(data.eip55(), vector)
         }
     }

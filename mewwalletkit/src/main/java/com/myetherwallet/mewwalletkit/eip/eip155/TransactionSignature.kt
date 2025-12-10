@@ -23,6 +23,22 @@ class TransactionSignature(
     internal lateinit var signatureYParity: RlpBigInteger
         private set
 
+    init {
+        // Calculate signatureYParity from v for EIP-1559 and EIP-2930 transactions
+        // For legacy transactions: v = 27 or 28, so yParity = v - 27 (0 or 1)
+        // For EIP-155 transactions: v = chainId * 2 + 35 + yParity
+        val normalizedV = when {
+            chainId != BigInteger.ZERO -> v - BigInteger.valueOf(35) - BigInteger.valueOf(2) * chainId
+            v >= BigInteger.valueOf(35) -> {
+                // EIP-155 format, extract chainId and yParity
+                val extractedChainId = (v - BigInteger.valueOf(35)) / BigInteger.valueOf(2)
+                v - BigInteger.valueOf(35) - BigInteger.valueOf(2) * extractedChainId
+            }
+            else -> v - BigInteger.valueOf(27) // Legacy format
+        }
+        signatureYParity = normalizedV.toRlp()
+    }
+
     @IgnoredOnParcel
     internal val r: BigInteger by lazy {
         rBytes.toBigInteger()
