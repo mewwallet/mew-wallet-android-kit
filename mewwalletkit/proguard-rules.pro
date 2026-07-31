@@ -19,3 +19,8 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Keep secp256k1 JNI classes and methods
+-keep class fr.acinq.secp256k1.** { *; }
+-keepclassmembers class fr.acinq.secp256k1.** { *; }
+-dontwarn fr.acinq.secp256k1.**

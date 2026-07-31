@@ -9,7 +9,7 @@ import pm.gnosis.utils.hexToByteArray
  * Created by BArtWell on 05.08.2021.
  */
 
-sealed class Type712(protected val parameters: List<Parameter712>) {
+sealed class Type712(val parameters: List<Parameter712>) {
 
     abstract val typeName: String
 

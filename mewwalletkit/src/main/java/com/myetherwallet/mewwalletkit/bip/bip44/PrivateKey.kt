@@ -25,7 +25,8 @@ class PrivateKey private constructor(
 
     companion object {
         fun createWithSeed(seed: ByteArray, network: Network): PrivateKey {
-            val output = HMAC.authenticate(HMAC_KEY_DATA, HMAC.Algorithm.HmacSHA512, seed)
+            val hmacKey = network.seedKey()
+            val output = HMAC.authenticate(hmacKey, HMAC.Algorithm.HmacSHA512, seed)
             if (output.count() != 64) {
                 throw InvalidDataException()
             }
@@ -48,6 +49,48 @@ class PrivateKey private constructor(
                 0,
                 network
             )
+
+        /**
+         * Creates a PrivateKey from a hex-encoded string.
+         *
+         * @param hex Hex-encoded private key (with or without 0x prefix)
+         * @param network The blockchain network
+         * @return PrivateKey instance
+         * @throws InvalidDataException if hex string is invalid or not 32 bytes
+         */
+        fun createWithHex(hex: String, network: Network): PrivateKey {
+            val decodedBytes = try {
+                hex.hexToByteArray()
+            } catch (_: Exception) {
+                throw InvalidDataException()
+            }
+            val privateKeyBytes = if (decodedBytes.size == 32) decodedBytes else throw InvalidDataException()
+            return createWithPrivateKey(privateKeyBytes, network)
+        }
+
+        /**
+         * Creates a PrivateKey from a Base58-encoded string.
+         *
+         * @param base58 Base58-encoded private key
+         * @param network The blockchain network
+         * @return PrivateKey instance
+         * @throws InvalidDataException if Base58 string is invalid or network doesn't support Base58
+         */
+        fun createWithBase58(base58: String, network: Network): PrivateKey {
+            val alphabet = network.alphabet()
+                ?: throw InvalidDataException()
+
+            val decodedBytes = base58.decodeBase58(alphabet)
+                ?: throw InvalidDataException()
+
+            val privateKeyBytes = when (decodedBytes.size) {
+                64 -> decodedBytes.prefix(32)
+                32 -> decodedBytes
+                else -> throw InvalidDataException()
+            }
+
+            return createWithPrivateKey(privateKeyBytes, network)
+        }
     }
 
     fun derived(nodes: Array<DerivationNode>): PrivateKey? {
@@ -72,7 +115,7 @@ class PrivateKey private constructor(
         }
 
         derivingIndex = node.index
-        data += derivingIndex.toByteArray()
+        data += derivingIndex.toByteArray(ByteOrder.BIG_ENDIAN)
 
         val digest: ByteArray
         try {
@@ -81,15 +124,24 @@ class PrivateKey private constructor(
             return null
         }
 
-        val factor = BigInteger(1, digest.copyOfRange(0, 32))
-        val curveOrder = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141".hexToBigInteger()
+        when (network) {
+            Network.SOLANA -> {
+                // Ed25519 derivation (SLIP-0010) - no curve math, just use digest directly
+                derivedPrivateKeyData = digest.copyOfRange(0, 32).padLeft(32)
+                derivedChainCode = digest.copyOfRange(32, 64)
+            }
+            else -> {
+                // secp256k1 derivation with curve order math
+                val factor = BigInteger(1, digest.copyOfRange(0, 32))
+                val curveOrder = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141".hexToBigInteger()
 
-        val rawKey = BigInteger(1, rawPrivateKey)
-        val calculatedKey = ((factor + rawKey) % curveOrder)
+                val rawKey = BigInteger(1, rawPrivateKey)
+                val calculatedKey = ((factor + rawKey) % curveOrder)
 
-        derivedPrivateKeyData = calculatedKey.toByteArrayWithoutLeadingZeroByte().padLeft(32)
-
-        derivedChainCode = digest.copyOfRange(32, 64)
+                derivedPrivateKeyData = calculatedKey.toByteArrayWithoutLeadingZeroByte().padLeft(32)
+                derivedChainCode = digest.copyOfRange(32, 64)
+            }
+        }
 
         val fingerprint = publicKeyData.ripemd160().prefix(4)
         val derivedPrivateKey = PrivateKey(
@@ -107,10 +159,10 @@ class PrivateKey private constructor(
     private fun derive(node: DerivationNode): PrivateKey? = null
 
     fun publicKey(compressed: Boolean? = null): PublicKey? {
-        try {
-            return PublicKey(rawPrivateKey, compressed ?: network.publicKeyCompressed(), chainCode, depth, fingerprint, index, network)
+        return try {
+            PublicKey(rawPrivateKey, compressed ?: network.publicKeyCompressed(), chainCode, depth, fingerprint, index, network)
         } catch (e: Exception) {
-            return null
+            null
         }
     }
 
@@ -146,4 +198,14 @@ class PrivateKey private constructor(
     override fun data() = rawPrivateKey
 
     override fun address() = publicKey()?.address()
+
+    fun ed25519(): ByteArray? {
+        return when (network) {
+            Network.SOLANA -> {
+                val (privateKey, publicKey) = rawPrivateKey.generateEd25519KeyPair()
+                privateKey // 32 bytes total
+            }
+            else -> null
+        }
+    }
 }
