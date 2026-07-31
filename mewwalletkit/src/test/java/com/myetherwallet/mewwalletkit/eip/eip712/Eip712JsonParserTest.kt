@@ -530,6 +530,29 @@ class Eip712JsonParserTest {
         assertEquals("Items array should have 2 elements", 2, itemsArray.parameters.size)
     }
 
+    @Test
+    fun testLargeJsonNumberPreservesHashPrecision() {
+        val maxUint256 = "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+        val typedData = { value: String ->
+            """
+            {
+              "types": {
+                "EIP712Domain": [{"name":"name","type":"string"}],
+                "Permit": [{"name":"value","type":"uint256"}]
+              },
+              "primaryType":"Permit",
+              "domain":{"name":"Test"},
+              "message":{"value":$value}
+            }
+            """.trimIndent()
+        }
+
+        val numericHash = Eip712Utils.getHash(typedData(maxUint256))
+        val stringHash = Eip712Utils.getHash(typedData("\"$maxUint256\""))
+
+        assertArrayEquals(stringHash, numericHash)
+    }
+
     /**
      * Mock adapter for testing EIP712JsonParser without external dependencies
      */

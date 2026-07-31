@@ -1,7 +1,8 @@
 package com.myetherwallet.mewwalletkit.eip.eip712
 
-import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
+import com.google.gson.ToNumberPolicy
 import com.myetherwallet.mewwalletkit.core.extension.keccak256
 import com.myetherwallet.mewwalletkit.eip.eip712.data.Struct712
 import java.io.InputStream
@@ -18,7 +19,10 @@ object Eip712Utils {
         val unescaped = unescapeJson(json).toString()
         val adapter = object : Eip712JsonAdapter {
             override fun parse(typedDataJson: String): Eip712JsonAdapter.Result {
-                return Gson().fromJson(typedDataJson, Eip712JsonAdapter.Result::class.java)
+                return GsonBuilder()
+                    .setObjectToNumberStrategy(ToNumberPolicy.BIG_DECIMAL)
+                    .create()
+                    .fromJson(typedDataJson, Eip712JsonAdapter.Result::class.java)
             }
 
             override fun parse(inputStream: InputStream): Eip712JsonAdapter.Result {
