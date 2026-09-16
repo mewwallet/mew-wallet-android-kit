@@ -23,8 +23,7 @@ open class LegacyTransaction(
     override var data: ByteArray = byteArrayOf(),
     override var from: Address? = null,
     override var signature: TransactionSignature? = null,
-    override var chainId: BigInteger? = null,
-    override var currency: TransactionCurrency? = null
+    override var chainId: BigInteger? = null
 ) : Transaction(
     nonce,
     gasLimit,
@@ -34,7 +33,6 @@ open class LegacyTransaction(
     from,
     signature,
     chainId,
-    currency,
     EIPTransactionType.LEGACY
 ), Parcelable {
 

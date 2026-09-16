@@ -31,8 +31,6 @@ abstract class Transaction(
     open var signature: TransactionSignature? = null,
     @Transient
     open var chainId: BigInteger? = null,
-    @Transient
-    open var currency: TransactionCurrency? = null,
     open var eipType: EIPTransactionType = EIPTransactionType.LEGACY
 ) : Parcelable {
 

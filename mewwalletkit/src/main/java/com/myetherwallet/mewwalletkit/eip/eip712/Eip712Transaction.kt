@@ -7,7 +7,6 @@ import com.myetherwallet.mewwalletkit.bip.bip44.Address
 import com.myetherwallet.mewwalletkit.core.data.rlp.*
 import com.myetherwallet.mewwalletkit.core.extension.*
 import com.myetherwallet.mewwalletkit.eip.eip155.Transaction
-import com.myetherwallet.mewwalletkit.eip.eip155.TransactionCurrency
 import com.myetherwallet.mewwalletkit.eip.eip155.TransactionSignature
 import com.myetherwallet.mewwalletkit.eip.eip681.AbiFunction
 import kotlinx.parcelize.Parcelize
@@ -26,8 +25,7 @@ class Eip712Transaction(
     override var data: ByteArray = ByteArray(0),
     override var from: Address? = null,
     override var signature: TransactionSignature? = null,
-    override var chainId: BigInteger? = null,
-    override var currency: TransactionCurrency? = null
+    override var chainId: BigInteger? = null
 ) : Transaction(
     nonce,
     gasLimit,
@@ -37,7 +35,6 @@ class Eip712Transaction(
     from,
     signature,
     chainId,
-    currency,
     EIPTransactionType.EIP712
 ) {
 
@@ -325,8 +322,7 @@ class Eip712Transaction(
         data: ByteArray = byteArrayOf(0x00),
         from: Address? = null,
         signature: TransactionSignature? = null,
-        chainId: ByteArray?,
-        currency: TransactionCurrency? = null
+        chainId: ByteArray?
     ) : this(
         nonce.toBigInteger(),
         maxPriorityFeePerGas.toBigInteger(),
@@ -338,8 +334,7 @@ class Eip712Transaction(
         data,
         from,
         signature,
-        chainId?.toBigInteger(),
-        currency
+        chainId?.toBigInteger()
     )
 
     constructor(
@@ -353,8 +348,7 @@ class Eip712Transaction(
         data: ByteArray,
         from: Address? = null,
         signature: TransactionSignature? = null,
-        chainId: ByteArray? = null,
-        currency: TransactionCurrency? = null
+        chainId: ByteArray? = null
     ) : this(
         nonce.hexToBigInteger(),
         maxPriorityFeePerGas.hexToBigInteger(),
@@ -366,8 +360,7 @@ class Eip712Transaction(
         data,
         from,
         signature,
-        chainId?.toBigInteger(),
-        currency
+        chainId?.toBigInteger()
     )
 
     override fun toString(): String {
