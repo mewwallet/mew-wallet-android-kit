@@ -5,7 +5,6 @@ import com.myetherwallet.mewwalletkit.core.data.rlp.*
 import com.myetherwallet.mewwalletkit.core.extension.*
 import com.myetherwallet.mewwalletkit.core.extension.toRlp
 import com.myetherwallet.mewwalletkit.eip.eip155.Transaction
-import com.myetherwallet.mewwalletkit.eip.eip155.TransactionCurrency
 import com.myetherwallet.mewwalletkit.eip.eip155.TransactionSignature
 import com.myetherwallet.mewwalletkit.eip.eip2930.AccessList
 import kotlinx.parcelize.Parcelize
@@ -27,8 +26,7 @@ class Eip1559Transaction(
     override var from: Address? = null,
     val accessList: Array<AccessList>?,
     override var signature: TransactionSignature? = null,
-    override var chainId: BigInteger? = null,
-    override var currency: TransactionCurrency? = null
+    override var chainId: BigInteger? = null
 ) : Transaction(
     nonce,
     gasLimit,
@@ -38,7 +36,6 @@ class Eip1559Transaction(
     from,
     signature,
     chainId,
-    currency,
     EIPTransactionType.EIP1559
 ) {
 
@@ -53,8 +50,7 @@ class Eip1559Transaction(
         from: Address? = null,
         accessList: Array<AccessList>?,
         signature: TransactionSignature? = null,
-        chainId: ByteArray?,
-        currency: TransactionCurrency? = null
+        chainId: ByteArray?
     ) : this(
         nonce.toBigInteger(),
         maxPriorityFeePerGas.toBigInteger(),
@@ -66,8 +62,7 @@ class Eip1559Transaction(
         from,
         accessList,
         signature,
-        chainId?.toBigInteger(),
-        currency
+        chainId?.toBigInteger()
     )
 
     constructor(
@@ -81,8 +76,7 @@ class Eip1559Transaction(
         from: Address? = null,
         accessList: Array<AccessList>?,
         signature: TransactionSignature? = null,
-        chainId: ByteArray? = null,
-        currency: TransactionCurrency? = null
+        chainId: ByteArray? = null
     ) : this(
         nonce.hexToBigInteger(),
         maxPriorityFeePerGas.hexToBigInteger(),
@@ -94,8 +88,7 @@ class Eip1559Transaction(
         from,
         accessList,
         signature,
-        chainId?.toBigInteger(),
-        currency
+        chainId?.toBigInteger()
     )
 
     override fun toString(): String {

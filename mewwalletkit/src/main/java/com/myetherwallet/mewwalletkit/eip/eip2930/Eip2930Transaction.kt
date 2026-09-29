@@ -4,7 +4,6 @@ import com.myetherwallet.mewwalletkit.bip.bip44.Address
 import com.myetherwallet.mewwalletkit.core.data.rlp.*
 import com.myetherwallet.mewwalletkit.core.extension.*
 import com.myetherwallet.mewwalletkit.eip.eip155.Transaction
-import com.myetherwallet.mewwalletkit.eip.eip155.TransactionCurrency
 import com.myetherwallet.mewwalletkit.eip.eip155.TransactionSignature
 import kotlinx.parcelize.Parcelize
 import java.math.BigInteger
@@ -24,8 +23,7 @@ class Eip2930Transaction(
     override var from: Address? = null,
     val accessList: Array<AccessList>?,
     override var chainId: BigInteger? = null,
-    override var signature: TransactionSignature? = null,
-    override var currency: TransactionCurrency? = null
+    override var signature: TransactionSignature? = null
 ) : Transaction(
     nonce,
     gasLimit,
@@ -35,7 +33,6 @@ class Eip2930Transaction(
     from,
     signature,
     chainId,
-    currency,
     EIPTransactionType.EIP2930
 ) {
 
